@@ -1,6 +1,6 @@
+use dbt_vfs::time::{Duration, Instant, UNIX_EPOCH};
 use std::process::Command;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use dbt_adbc::QueryCtx;
 use dbt_agate::MappedSequence;
@@ -315,7 +315,7 @@ async fn debug_lake_compute(
     // within a namespace that must already exist.
     let probe_table = format!(
         "__dbt_debug_probe_{}",
-        SystemTime::now()
+        dbt_vfs::time::system_now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or(Duration::ZERO)
             .as_nanos()

@@ -126,7 +126,7 @@ async fn prompt_to_set_state() -> FsResult<()> {
         console::style("~/.dbt/user_settings.yml").bold()
     );
 
-    let confirmed = tokio::task::spawn_blocking(move || {
+    let confirmed = dbt_vfs::thread::spawn_blocking(move || {
         dialoguer::Confirm::new()
             .with_prompt(prompt)
             .default(true)

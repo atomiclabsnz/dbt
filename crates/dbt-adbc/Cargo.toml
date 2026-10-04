@@ -21,6 +21,7 @@ adbc-fuzzying = []
 repl = ["dialoguer", "clap", "dbt-pretty-table"]
 
 [dependencies]
+dbt-vfs = { workspace = true }
 adbc-core = { workspace = true }
 arrow-array = { workspace = true }
 arrow-schema = { workspace = true }

@@ -1,3 +1,4 @@
+use dbt_vfs::time::Instant;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
@@ -6,7 +7,6 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicIsize, AtomicU64, AtomicUsize, Ordering};
 use std::task::{Poll, Waker};
-use std::time::Instant;
 
 use dbt_adapter_core::AdapterType;
 use dbt_adbc::{Connection, ConnectionFactory};

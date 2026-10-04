@@ -37,11 +37,11 @@
 //! }
 //! ```
 
+use dbt_vfs::time::Instant;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::Instant;
 
 use arrow_schema::{Field, Schema};
 use chrono::{DateTime, Utc};

@@ -9,6 +9,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 use std::sync::Condvar;
 use std::sync::Mutex;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 
 use indicatif::MultiProgress;
@@ -76,10 +77,16 @@ where
         }
     }
 
+    /// ferrion-wasm: no ticker thread on wasm (bars redraw on their own
+    /// updates; spinners do not animate).
+    #[cfg(target_arch = "wasm32")]
+    pub fn start_ticker(&mut self) {}
+
     /// Starts the background ticker thread for progress bar animations.
     ///
     /// The ticker thread periodically updates all active progress bars and
     /// spinners to animate them. If already started, this is a no-op.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn start_ticker(&mut self) {
         if self.ticker.is_some() {
             // Already started

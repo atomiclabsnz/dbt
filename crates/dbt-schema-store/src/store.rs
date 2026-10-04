@@ -159,7 +159,7 @@ impl SchemaStoreState {
 
         // Pre-populate the SCC map so exists()/get_schema() work normally.
         // Only snapshot Selected entries and all non-Selected entries are pre-loaded.
-        let now_ms = SystemTime::now()
+        let now_ms = dbt_vfs::time::system_now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap_or(Duration::ZERO)
             .as_millis();
@@ -215,7 +215,7 @@ impl SchemaStoreState {
         let key = entry.to_string();
         let guard = remote.read().expect("parquet_cache lock poisoned");
         if guard.contains(&key) {
-            let now_ms = SystemTime::now()
+            let now_ms = dbt_vfs::time::system_now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or(Duration::ZERO)
                 .as_millis();
@@ -272,7 +272,7 @@ impl SchemaStoreState {
             let guard = cache.read().expect("parquet_cache lock poisoned");
             if let Some(existing) = guard.get(&entry.to_string()).cloned() {
                 drop(guard);
-                let now_ms = SystemTime::now()
+                let now_ms = dbt_vfs::time::system_now()
                     .duration_since(SystemTime::UNIX_EPOCH)
                     .unwrap_or(Duration::ZERO)
                     .as_millis();
@@ -297,7 +297,7 @@ impl SchemaStoreState {
             guard.upsert(entry.to_string(), schema_entry.clone())?;
         }
 
-        let now_ms = SystemTime::now()
+        let now_ms = dbt_vfs::time::system_now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap_or(Duration::ZERO)
             .as_millis();
@@ -350,7 +350,7 @@ impl SchemaStoreState {
         refresh_interval: Option<Duration>,
     ) -> bool {
         if let Some(interval) = refresh_interval {
-            let now_millis = SystemTime::now()
+            let now_millis = dbt_vfs::time::system_now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or(Duration::ZERO)
                 .as_millis();
@@ -586,7 +586,7 @@ impl SchemaStore {
 
         // Also insert into cached_entries so exists()/get_schema() see the entry
         // immediately within the same run.
-        let now_ms = SystemTime::now()
+        let now_ms = dbt_vfs::time::system_now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap_or(Duration::ZERO)
             .as_millis();
@@ -888,7 +888,7 @@ pub fn read_cached_schema_from_parquet(
 
     let timestamp = dbt_vfs::fs::metadata(table_path)
         .and_then(|m| m.modified())
-        .unwrap_or_else(|_| SystemTime::now())
+        .unwrap_or_else(|_| dbt_vfs::time::system_now())
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap_or(Duration::from_secs(0))
         .as_millis();

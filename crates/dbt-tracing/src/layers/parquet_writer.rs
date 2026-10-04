@@ -1,7 +1,9 @@
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
-use std::thread::{self, JoinHandle};
+// ferrion-wasm: on wasm the writer "thread" runs when the shutdown handle
+// joins it (dbt_vfs::thread::spawn); until then records queue in the channel.
+use dbt_vfs::thread::{self, JoinHandle};
 
 use crate::{
     LogRecordInfo, SpanEndInfo, SpanStartInfo, TelemetryOutputFlags, TelemetryRecord,

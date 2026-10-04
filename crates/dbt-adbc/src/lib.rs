@@ -175,7 +175,7 @@ where
     #[inline(never)]
     fn new_connection(&self) -> Result<Box<dyn Connection>, Cancellable<E>> {
         let _span = span!("MapReduceInner::new_connection");
-        let start = std::time::Instant::now();
+        let start = dbt_vfs::time::Instant::now();
         let res = self
             .connection_factory
             .new_connection(self.node_id.as_deref());
@@ -194,7 +194,7 @@ where
 
     fn map(&self, conn: &'_ mut dyn Connection, key: &K) -> V {
         let _span = span!("MapReduceInner::map");
-        let start = std::time::Instant::now();
+        let start = dbt_vfs::time::Instant::now();
         let res = (self.map_f)(conn, key);
         let elapsed = start.elapsed();
         self.task_count.fetch_add(1, Ordering::SeqCst);
@@ -271,7 +271,7 @@ where
     ) -> Pin<Box<dyn Future<Output = Result<Box<dyn Connection>, Cancellable<E>>> + Send>> {
         let inner = Arc::clone(&self.inner); // clone needed to move it into lambda
         let future = async move {
-            match tokio::task::spawn_blocking(move || {
+            match dbt_vfs::thread::spawn_blocking(move || {
                 let _sp = cur_span.entered();
                 inner.new_connection()
             })
@@ -304,7 +304,7 @@ where
                 let i = inner.key_counter.fetch_add(1, Ordering::SeqCst);
                 if i >= keys.len() {
                     // No more keys to process, recycle connection and exit.
-                    let _ = tokio::task::spawn_blocking(move || {
+                    let _ = dbt_vfs::thread::spawn_blocking(move || {
                         let _sp = cur_span.entered();
                         inner.recycle_connection(conn);
                     })
@@ -312,7 +312,7 @@ where
                     return Ok(());
                 }
                 let cur_span = cur_span.clone();
-                let handle = tokio::task::spawn_blocking(move || {
+                let handle = dbt_vfs::thread::spawn_blocking(move || {
                     let _sp = cur_span.entered();
                     let key = &keys_for_task[i];
                     let value = inner.map(&mut *conn, key);
@@ -362,7 +362,7 @@ where
         token: &CancellationToken,
     ) -> Result<(), CancelledError> {
         while self.inner.key_counter.load(Ordering::SeqCst) < key_count {
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            dbt_vfs::time::sleep(Duration::from_secs(1)).await;
             token.check_cancellation()?;
         }
         Ok(())
@@ -460,7 +460,7 @@ where
             } else if self.inner.key_counter.load(Ordering::SeqCst) < keys.len() {
                 let us = self.inner.avg_conn_time_us().floor() as u64;
                 let duration = Duration::from_micros(us).min(Duration::from_secs(1));
-                tokio::time::sleep(duration).await;
+                dbt_vfs::time::sleep(duration).await;
             }
 
             token.check_cancellation()?;

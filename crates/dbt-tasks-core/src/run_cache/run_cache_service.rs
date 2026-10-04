@@ -11,10 +11,10 @@
 //! adapter relation rendering, warehouse metadata lookups, and skip policy.
 //! Stable service DTO construction lives in `dbt-state::request_builder`.
 
+use dbt_vfs::time::Instant;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
-use std::time::Instant;
 
 use tokio::sync::mpsc;
 
@@ -1169,8 +1169,8 @@ impl TelemetryDispatcher {
         // `Sender` clone held by this task would stop `recv` from ever
         // returning `None`, hanging `flush()` forever.
         let mut buffer: Vec<QueuedTelemetryEvent> = Vec::new();
-        let mut interval = tokio::time::interval(TELEMETRY_MAX_EMIT_INTERVAL);
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        let mut interval = dbt_vfs::time::interval(TELEMETRY_MAX_EMIT_INTERVAL);
+        interval.set_missed_tick_behavior(dbt_vfs::time::MissedTickBehavior::Delay);
         loop {
             tokio::select! {
                 event = receiver.recv() => {

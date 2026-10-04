@@ -1,6 +1,6 @@
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 #[cfg(not(target_arch = "wasm32"))]
 use dbt_vfs::tokio_fs as fs;
@@ -80,7 +80,7 @@ fn expires_at_from(response: &TokenResponse) -> Option<f64> {
     }
     response.expires_in.and_then(|secs| {
         if secs.is_finite() && secs > 0.0 {
-            (SystemTime::now() + std::time::Duration::from_secs_f64(secs))
+            (dbt_vfs::time::system_now() + std::time::Duration::from_secs_f64(secs))
                 .duration_since(UNIX_EPOCH)
                 .ok()
                 .map(|d| d.as_secs_f64())

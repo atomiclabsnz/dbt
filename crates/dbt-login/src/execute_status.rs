@@ -79,7 +79,7 @@ pub async fn execute_login_status() -> FsResult<()> {
 }
 
 fn format_expiry(expires_at: SystemTime) -> String {
-    let now = SystemTime::now();
+    let now = dbt_vfs::time::system_now();
     match expires_at.duration_since(now) {
         Ok(remaining) => {
             let total_secs = remaining.as_secs();

@@ -3,8 +3,8 @@
 //! The recorder provides a unified interface for emitting events from both
 //! synchronous (Adapter) and asynchronous (MetadataAdapter) contexts.
 
+use dbt_vfs::time::Instant;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
-use std::time::Instant;
 
 use std::sync::Arc;
 use tokio::sync::mpsc;

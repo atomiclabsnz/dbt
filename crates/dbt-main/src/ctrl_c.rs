@@ -3,8 +3,8 @@ use dbt_common::FsResult;
 use dbt_common::cancellation::{CancellationReport, CancellationTokenSource, TIMEOUT_AFTER_CTRL_C};
 use dbt_common::fail_fast::FailFast;
 
+use dbt_vfs::time::{Duration, Instant};
 use std::pin::Pin;
-use std::time::{Duration, Instant};
 
 /// Runs the given future while also listening for Ctrl+C (or fail-fast) signals.
 ///
@@ -64,7 +64,7 @@ pub fn run_future_with_ctrlc_support<'a>(
                 cst.cancel();
 
                 let token = cst.token();
-                let cancel_stmts = tokio::task::spawn_blocking(move || {
+                let cancel_stmts = dbt_vfs::thread::spawn_blocking(move || {
                     let mut stmt_count = 0;
                     let mut fail_count = 0;
                     // Actively cancel all the running database operations. This tells
@@ -83,7 +83,7 @@ pub fn run_future_with_ctrlc_support<'a>(
                             if token.is_cancelled() {
                                 break;
                             }
-                            std::thread::sleep(Duration::from_millis(10));
+                            dbt_vfs::thread::sleep(Duration::from_millis(10));
                         }
                         from_stmt_id = report.next_stmt_id;
                     }
@@ -93,7 +93,7 @@ pub fn run_future_with_ctrlc_support<'a>(
                         next_stmt_id: from_stmt_id,
                     }
                 });
-                let timed_out = tokio::time::timeout(TIMEOUT_AFTER_CTRL_C, ctrl_c_future)
+                let timed_out = dbt_vfs::time::timeout(TIMEOUT_AFTER_CTRL_C, ctrl_c_future)
                     .await
                     .is_err();
                 let final_wait_duration = ctrl_c_t0.elapsed();

@@ -5,14 +5,13 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use dbt_common::tracing::dbt_emit::{emit_warn_log_message, print_err};
 use dbt_common::{AdapterError, AdapterErrorKind, AdapterResult, ErrorCode};
+use dbt_vfs::time::{Duration, Instant, UNIX_EPOCH};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use std::cell::RefCell;
 #[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
-use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[cfg(not(target_arch = "wasm32"))]
 use ureq::http;
 #[cfg(not(target_arch = "wasm32"))]
@@ -155,7 +154,7 @@ impl DatabricksApiClient {
                 ));
             }
 
-            thread::sleep(Duration::from_secs(POLL_INTERVAL_SECS));
+            dbt_vfs::thread::sleep(Duration::from_secs(POLL_INTERVAL_SECS));
         }
     }
 
@@ -471,7 +470,7 @@ impl DatabricksApiClient {
                 ));
             }
 
-            thread::sleep(Duration::from_secs(5));
+            dbt_vfs::thread::sleep(Duration::from_secs(5));
         }
     }
 
@@ -498,7 +497,7 @@ impl DatabricksApiClient {
 
                         // Adapted core backoff logic
                         let base_wait = 2_u64.pow(attempt);
-                        let jitter = (SystemTime::now()
+                        let jitter = (dbt_vfs::time::system_now()
                             .duration_since(UNIX_EPOCH)
                             .unwrap()
                             .subsec_micros()
@@ -517,7 +516,7 @@ impl DatabricksApiClient {
                             ),
                         );
 
-                        thread::sleep(wait_time);
+                        dbt_vfs::thread::sleep(wait_time);
                         last_error = Some(e);
                     } else {
                         return Err(e);
@@ -640,7 +639,7 @@ impl DatabricksApiClient {
                 ));
             }
 
-            thread::sleep(Duration::from_secs(POLL_INTERVAL_SECS));
+            dbt_vfs::thread::sleep(Duration::from_secs(POLL_INTERVAL_SECS));
         }
     }
 

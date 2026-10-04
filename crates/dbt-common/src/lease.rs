@@ -1,6 +1,6 @@
+use dbt_vfs::time::sleep;
 use sha2::{Digest, Sha256};
 use tokio::task::JoinHandle;
-use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::path::DbtPath;
@@ -9,12 +9,9 @@ use crate::time::{current_time_micros, time_micros};
 use crate::tracing::dbt_emit::emit_info_log_message;
 use crate::{ErrorCode, FsError, FsResult};
 
+use dbt_vfs::time::{Duration, Instant};
 use std::path::Path;
-use std::{
-    path::PathBuf,
-    sync::Arc,
-    time::{Duration, Instant, SystemTime},
-};
+use std::{path::PathBuf, sync::Arc};
 
 struct Lease {
     id: String,
@@ -151,7 +148,7 @@ impl LeaseHandler {
                 _ => (),
             }
             // acquire the lease on all cases where current lease is invalid
-            let expiry_ms = time_micros(SystemTime::now() + ttl);
+            let expiry_ms = time_micros(dbt_vfs::time::system_now() + ttl);
             self.write(&lease_id, expiry_ms)?;
             return Ok(expiry_ms);
         }
@@ -165,7 +162,7 @@ impl LeaseHandler {
     // If the lease is still valid for the lease_id, renew the lease with a new expiration value
     // If lease invalid or does not exist return an error
     fn renew(&self, lease_id: &str, ttl: Duration) -> FsResult<u128> {
-        let expiry = time_micros(SystemTime::now() + ttl);
+        let expiry = time_micros(dbt_vfs::time::system_now() + ttl);
         match &self.read() {
             // Another process holds a valid lease — cannot renew or re-acquire
             Ok(lease_data) if lease_data.is_valid() && lease_data.lease_id != lease_id => {
@@ -240,6 +237,19 @@ impl Drop for LeaseGuard {
 }
 
 fn spawn_lease_renewal(mut lease: Lease, ttl: Duration, interval: Duration) -> LeaseGuard {
+    // ferrion-wasm: one wasm instance is one process, and a renewal loop over a
+    // sleep that never waits (dbt_vfs::time) would rewrite the lease file on
+    // every scheduler turn. Renew once and hold it until the guard drops.
+    #[cfg(target_arch = "wasm32")]
+    let handle = {
+        let _ = interval;
+        lease.renew(ttl).ok();
+        tokio::spawn(async move {
+            let _held = lease;
+            std::future::pending::<()>().await
+        })
+    };
+    #[cfg(not(target_arch = "wasm32"))]
     let handle = tokio::spawn(async move {
         loop {
             sleep(interval).await;

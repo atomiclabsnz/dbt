@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
+use dbt_vfs::time::Duration as TokioDuration;
 use redis::aio::{ConnectionLike, MultiplexedConnection};
 use redis::cluster::ClusterClient;
 use redis::cluster_async::ClusterConnection;
@@ -9,7 +10,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 use tokio::sync::Mutex;
-use tokio::time::Duration as TokioDuration;
 
 use dbt_schemas::schemas::ResolvedCloudConfig;
 
@@ -388,7 +388,7 @@ impl<T: ConnectionLike + Sync + Send + 'static> TaskCache for TaskCacheRedis<T> 
                     value.timestamp = Utc::now() + delay; // We write the next heartbeat time to heartbeat
                     task_cache.set_json_value(&key, &value).await?;
 
-                    tokio::time::sleep(TokioDuration::from_micros(
+                    dbt_vfs::time::sleep(TokioDuration::from_micros(
                         delay.num_microseconds().unwrap() as u64,
                     ))
                     .await;

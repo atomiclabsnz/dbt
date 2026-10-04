@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use dbt_adapter::Adapter;
 use dbt_adapter::response::AdapterResponse;
@@ -402,7 +401,7 @@ impl TaskRunner {
                         self.resolved_state.operations.on_run_end.iter().enumerate()
                     {
                         let unique_id = operation.__common_attr__.unique_id.clone();
-                        let start_time = SystemTime::now();
+                        let start_time = dbt_vfs::time::system_now();
 
                         // dbt-core stops running hooks once one fails and records the
                         // remainder as skipped.
@@ -412,7 +411,7 @@ impl TaskRunner {
                                 num_rows: None,
                                 rows_affected: None,
                                 start_time,
-                                end_time: SystemTime::now(),
+                                end_time: dbt_vfs::time::system_now(),
                                 status: NodeStatus::SkippedUpstreamFailed,
                                 thread_id: "main".to_string(),
                                 message: None,
@@ -464,7 +463,7 @@ impl TaskRunner {
                             num_rows: None,
                             rows_affected: None,
                             start_time,
-                            end_time: SystemTime::now(),
+                            end_time: dbt_vfs::time::system_now(),
                             status,
                             thread_id: "main".to_string(),
                             message: error_message,

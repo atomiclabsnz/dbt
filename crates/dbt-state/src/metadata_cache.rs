@@ -5,9 +5,9 @@
 //! metadata lookups are deliberately not cached so callers can fail open and
 //! retry later in the same invocation.
 
+use dbt_vfs::time::{Duration, Instant};
 use std::fmt::Display;
 use std::future::Future;
-use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 

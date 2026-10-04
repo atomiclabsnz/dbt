@@ -10,7 +10,7 @@ use minijinja::State;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use std::{thread, time::Duration};
+use std::time::Duration;
 
 mod adapter_engine;
 pub use adapter_engine::AdapterEngine;
@@ -128,7 +128,7 @@ pub fn execute_query_with_retry(
             Ok(result) => return Ok(result),
             Err(err) => {
                 last_error = Some(err.clone());
-                thread::sleep(Duration::from_secs(1));
+                dbt_vfs::thread::sleep(Duration::from_secs(1));
                 attempt += 1;
             }
         }

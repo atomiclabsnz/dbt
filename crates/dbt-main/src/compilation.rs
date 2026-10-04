@@ -536,7 +536,7 @@ impl<'a> CompilationPhasesExecutor<'a> {
                 {
                     // Write run_results with error status for nodes that had
                     // resolution errors so that `dbt retry` and `dbt agent` can pick them up.
-                    let now = SystemTime::now();
+                    let now = dbt_vfs::time::system_now();
                     let error_stats = Stats {
                         stats: resolved_state
                             .nodes_with_resolution_errors

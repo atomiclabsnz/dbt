@@ -3,11 +3,11 @@
 //! This module contains the internal `ContextualProgressBar` struct that wraps
 //! indicatif's `ProgressBar` with additional context tracking and counter support.
 
+use dbt_vfs::time::{Duration, Instant};
 use std::fmt;
 use std::fmt::Display;
 use std::sync::Arc;
 use std::sync::RwLock;
-use std::time::{Duration, Instant};
 
 use counter::Counter;
 use indicatif::ProgressBar;
@@ -351,6 +351,7 @@ impl ContextualProgressBar {
     }
 
     /// Ticks the progress bar to update animations.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))] // only the ticker ticks
     pub fn tick(&self) {
         self.main_bar.tick();
         if let Some(bar) = &self.context_bar {

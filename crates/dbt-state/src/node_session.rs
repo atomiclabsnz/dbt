@@ -188,7 +188,7 @@ impl NodeCacheSession {
 
                 TaskState::InProgress => {
                     on_contention(Contention::Waiting);
-                    tokio::time::sleep(std::time::Duration::from_micros(
+                    dbt_vfs::time::sleep(std::time::Duration::from_micros(
                         delay.num_microseconds().unwrap_or(1_000) as u64,
                     ))
                     .await;

@@ -1,8 +1,8 @@
+use dbt_vfs::time::Instant;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::mpsc;
-use std::time::Instant;
 
 use crate::materialize::{NodeHookPhase, NodeHookStyle, execute_node_hooks, model_hook_style};
 use crate::runnable::function::execute_function_remote;

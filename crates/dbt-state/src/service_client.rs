@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use dbt_common::ErrorCode;
@@ -608,7 +608,7 @@ pub fn new_request_id() -> String {
 }
 
 fn current_epoch_millis() -> i64 {
-    SystemTime::now()
+    dbt_vfs::time::system_now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| i64::try_from(duration.as_millis()).unwrap_or(i64::MAX))
         .unwrap_or_default()

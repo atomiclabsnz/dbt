@@ -31,7 +31,7 @@ pub struct CachedToken {
 impl CachedToken {
     pub fn is_fresh(&self) -> bool {
         match self.expires_at {
-            Some(expires_at) => expires_at > SystemTime::now() + TOKEN_REFRESH_WINDOW,
+            Some(expires_at) => expires_at > dbt_vfs::time::system_now() + TOKEN_REFRESH_WINDOW,
             None => true,
         }
     }
@@ -333,7 +333,7 @@ fn expires_at_from(response: &TokenResponse) -> Option<SystemTime> {
     }
     response
         .expires_in
-        .map(|secs| SystemTime::now() + duration_from_seconds(secs))
+        .map(|secs| dbt_vfs::time::system_now() + duration_from_seconds(secs))
 }
 
 fn epoch_seconds_to_system_time(seconds: f64) -> SystemTime {

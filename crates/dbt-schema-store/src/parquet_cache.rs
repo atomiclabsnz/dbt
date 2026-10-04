@@ -31,7 +31,7 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, UNIX_EPOCH},
 };
 
 use arrow::ipc::{
@@ -340,7 +340,7 @@ pub(crate) fn compact_epochs(
     epochs: &[(u32, PathBuf)],
     ctx: &CompactionContext<'_>,
 ) -> SchemaStoreResult<()> {
-    let now_ms = SystemTime::now()
+    let now_ms = dbt_vfs::time::system_now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or(Duration::ZERO)
         .as_millis() as u64;
@@ -456,7 +456,7 @@ impl ParquetSchemaCache {
             .map(|(k, d)| (k.as_str(), *d))
             .collect();
 
-        let now_ms = SystemTime::now()
+        let now_ms = dbt_vfs::time::system_now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or(Duration::ZERO)
             .as_millis() as u64;
@@ -527,7 +527,7 @@ impl ParquetSchemaCache {
     /// deserialized [`SchemaEntry`] is stored in the `OnceLock` immediately so
     /// subsequent `get()` calls don't re-deserialize.
     pub fn upsert(&mut self, lookup_key: String, entry: SchemaEntry) -> SchemaStoreResult<()> {
-        let cached_at_ms = SystemTime::now()
+        let cached_at_ms = dbt_vfs::time::system_now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or(Duration::ZERO)
             .as_millis() as u64;
@@ -672,6 +672,7 @@ fn extract_source_identity_from_key(lookup_key: &str) -> String {
 mod tests {
     use super::*;
     use arrow_schema::{DataType, Field, Schema};
+    use std::time::SystemTime;
 
     fn make_schema(name: &str) -> SchemaRef {
         Arc::new(Schema::new(vec![Field::new(name, DataType::Utf8, false)]))

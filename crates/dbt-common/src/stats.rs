@@ -101,7 +101,7 @@ impl Stat {
         message: Option<String>,
         thread_id: i32,
     ) -> Self {
-        let end_time = SystemTime::now();
+        let end_time = dbt_vfs::time::system_now();
         let message = message.or_else(|| Some(status.default_message()));
 
         Stat {

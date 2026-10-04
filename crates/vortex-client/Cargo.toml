@@ -13,6 +13,7 @@ default = []
 scheduling-tests = []
 
 [dependencies]
+dbt-vfs = { workspace = true }
 proto-rust = { path = "../proto-rust" }
 
 dbt-fusion-workspace-hack = { version = "0.1" }

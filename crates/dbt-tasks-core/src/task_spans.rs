@@ -438,7 +438,7 @@ fn create_node_processed_on_task_close(
     Box::new(move |this_span, task_span, _| {
         // Calculate duration of this NodeEvaluated span
         let phase_duration_ms = read_span_start_info(task_span, |start_info| {
-            let now = std::time::SystemTime::now();
+            let now = dbt_vfs::time::system_now();
             now.duration_since(start_info.start_time_unix_nano)
                 .ok()
                 .map(|d| d.as_millis() as u64)
@@ -474,7 +474,7 @@ fn create_node_processed_on_task_skip(
     Box::new(move |this_span, task_span, _| {
         // Calculate duration of this NodeEvaluated span
         let phase_duration_ms = read_span_start_info(task_span, |start_info| {
-            let now = std::time::SystemTime::now();
+            let now = dbt_vfs::time::system_now();
             now.duration_since(start_info.start_time_unix_nano)
                 .ok()
                 .map(|d| d.as_millis() as u64)

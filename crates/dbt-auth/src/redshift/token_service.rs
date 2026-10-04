@@ -1,7 +1,7 @@
+use dbt_vfs::time::{Duration, Instant};
 use std::collections::HashMap;
 use std::io::Read;
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant};
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;

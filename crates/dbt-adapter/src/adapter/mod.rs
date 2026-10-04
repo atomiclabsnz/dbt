@@ -312,10 +312,10 @@ impl Adapter {
     ) -> AdapterResult<(AdapterResponse, AgateTable)> {
         match &self.inner {
             Typed { adapter, .. } => {
-                let t_borrow = std::time::Instant::now();
+                let t_borrow = dbt_vfs::time::Instant::now();
                 let mut conn = adapter.borrow_tlocal_connection(None, None)?;
                 tracing::debug!("borrow_tlocal_connection() took {:?}", t_borrow.elapsed());
-                let t_execute = std::time::Instant::now();
+                let t_execute = dbt_vfs::time::Instant::now();
                 let result = adapter.execute(
                     None,
                     conn.as_mut(),

@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -139,7 +139,7 @@ impl OAuthPassiveResolver {
         let cache: OAuthSessionCache =
             serde_json::from_slice(&bytes).map_err(|e| AuthError::Malformed(e.to_string()))?;
 
-        let now = SystemTime::now();
+        let now = dbt_vfs::time::system_now();
 
         let matching: Vec<&OAuthSession> = cache
             .sessions
@@ -192,7 +192,7 @@ impl OAuthPassiveResolver {
                 .collect();
 
             let expires_in = token.expires_in.unwrap_or(3600.0);
-            let expires_at = SystemTime::now() + Duration::from_secs(expires_in as u64);
+            let expires_at = dbt_vfs::time::system_now() + Duration::from_secs(expires_in as u64);
 
             let new_session = OAuthSession {
                 access_token: token.access_token,
@@ -357,7 +357,7 @@ impl OAuthInteractiveResolver {
             .collect();
 
         let expires_in = token.expires_in.unwrap_or(3600.0);
-        let expires_at = SystemTime::now() + Duration::from_secs(expires_in as u64);
+        let expires_at = dbt_vfs::time::system_now() + Duration::from_secs(expires_in as u64);
 
         let session = OAuthSession {
             access_token: token.access_token,
@@ -1049,6 +1049,7 @@ mod tests {
     use super::*;
     use crate::session_cache::OAuthSessionCache;
     use std::io::Write as _;
+    use std::time::SystemTime;
     use std::time::{Duration, UNIX_EPOCH};
     use tempfile::NamedTempFile;
 

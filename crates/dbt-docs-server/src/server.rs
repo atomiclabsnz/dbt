@@ -121,7 +121,7 @@ async fn shutdown_signal() {
 
     // Bound the drain: force exit if in-flight requests do not complete in time.
     tokio::spawn(async {
-        tokio::time::sleep(SHUTDOWN_GRACE).await;
+        dbt_vfs::time::sleep(SHUTDOWN_GRACE).await;
         eprintln!("dbt docs serve: drain grace period elapsed; forcing exit");
         std::process::exit(0);
     });

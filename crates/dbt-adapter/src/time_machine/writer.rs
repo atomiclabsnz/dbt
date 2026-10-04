@@ -133,7 +133,7 @@ pub async fn writer_task(
         }
 
         // Try to receive with timeout
-        let recv_result = tokio::time::timeout(flush_duration, receiver.recv()).await;
+        let recv_result = dbt_vfs::time::timeout(flush_duration, receiver.recv()).await;
 
         match recv_result {
             Ok(Some(event)) => {

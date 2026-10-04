@@ -130,9 +130,12 @@ pub fn run_cli_with_code(cli: Box<Cli>, arg: SystemArgs, feature_stack: Arc<Feat
     // and does not affect the runtime.
     // ferrion-wasm: there are no threads on wasm; everything runs on a
     // current-thread runtime regardless of `--no-parallel`.
+    // No `enable_all()` on wasm: the time driver reads std's clock as it is
+    // built (a panic on wasm32-unknown-unknown), and there is no IO driver to
+    // enable. Timers on the run path go through dbt_vfs::time, which never
+    // waits on wasm.
     #[cfg(target_arch = "wasm32")]
     let tokio_rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
         .build()
         .expect("failed to initialize current-thread tokio runtime");
     #[cfg(not(target_arch = "wasm32"))]

@@ -5,7 +5,6 @@ mod snapshot;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use dbt_common::FsResult;
 use dbt_common::constants::CLONING;
@@ -116,7 +115,7 @@ pub trait Cloneable: InternalDbtNodeAttributes {
         ctx: &'a mut TaskRunnerCtx,
     ) -> Pin<Box<dyn Future<Output = FsResult<NodeStatus>> + Send + 'a>> {
         Box::pin(async move {
-            let start = SystemTime::now();
+            let start = dbt_vfs::time::system_now();
             let unique_id = &self.common().unique_id;
             let thread_id = ctx.thread_id;
 

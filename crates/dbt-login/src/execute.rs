@@ -102,16 +102,16 @@ pub async fn execute_login(
 
     // Wait for both authorize URLs (with timeout), combine them into a single browser open:
     // the platform-auth URL with the base64-encoded state URL as a query param.
-    let url_timeout = tokio::time::Duration::from_secs(30);
+    let url_timeout = dbt_vfs::time::Duration::from_secs(30);
     tokio::spawn(async move {
-        let state_url = match tokio::time::timeout(url_timeout, state_url_rx).await {
+        let state_url = match dbt_vfs::time::timeout(url_timeout, state_url_rx).await {
             Ok(Ok(url)) => url,
             _ => {
                 tracing::warn!("timed out waiting for dbt State authorize URL");
                 return;
             }
         };
-        let platform_url = match tokio::time::timeout(url_timeout, platform_url_rx).await {
+        let platform_url = match dbt_vfs::time::timeout(url_timeout, platform_url_rx).await {
             Ok(Ok(url)) => url,
             _ => {
                 tracing::warn!("timed out waiting for dbt platform authorize URL");
@@ -192,7 +192,7 @@ pub async fn execute_login(
         _ = async {
             loop {
                 if token.is_cancelled() { break; }
-                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                dbt_vfs::time::sleep(dbt_vfs::time::Duration::from_millis(50)).await;
             }
         } => {
             let _ = state_abort_tx.send(());

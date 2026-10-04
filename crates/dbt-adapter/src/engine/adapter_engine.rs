@@ -372,13 +372,13 @@ pub(crate) fn adbc_execute_with_options(
             return Ok((Arc::new(Schema::empty()), Vec::new()));
         }
 
-        let t_exec = std::time::Instant::now();
+        let t_exec = dbt_vfs::time::Instant::now();
         let reader = stmt.execute()?;
         log_step_duration(
             "stmt.execute() (submit+wait_for_completion, returns reader)",
             t_exec.elapsed(),
         );
-        let t_schema = std::time::Instant::now();
+        let t_schema = dbt_vfs::time::Instant::now();
         let schema = reader.schema();
         log_step_duration("reader.schema()", t_schema.elapsed());
         let mut batches = Vec::with_capacity(1);
@@ -392,7 +392,7 @@ pub(crate) fn adbc_execute_with_options(
 
         // This loop has been discovered to inexplicably hang in some circumstances
         // See PR https://github.com/dbt-labs/fs/pull/7755
-        let t_loop = std::time::Instant::now();
+        let t_loop = dbt_vfs::time::Instant::now();
         for res in reader {
             let batch = res.map_err(adbc_core::error::Error::from)?;
             batches.push(batch);
@@ -406,7 +406,7 @@ pub(crate) fn adbc_execute_with_options(
     let _span = span!("SqlEngine::execute");
 
     let sql_hash = code_hash(sql.as_ref());
-    let t_span_create = std::time::Instant::now();
+    let t_span_create = dbt_vfs::time::Instant::now();
     let query_span_guard = create_debug_span(QueryExecuted::start(
         sql.to_string(),
         sql_hash,
@@ -417,7 +417,7 @@ pub(crate) fn adbc_execute_with_options(
     .entered();
     log_step_duration("create_debug_span(...).entered()", t_span_create.elapsed());
 
-    let t_do_execute = std::time::Instant::now();
+    let t_do_execute = dbt_vfs::time::Instant::now();
     let (schema, batches) = match do_execute(conn) {
         Ok(res) => res,
         Err(err @ (Cancellable::Cancelled | Cancellable::Error(_))) => {
@@ -464,7 +464,7 @@ pub(crate) fn adbc_execute_with_options(
         "do_execute(conn) (closure: stmt.execute + schema + batch loop)",
         t_do_execute.elapsed(),
     );
-    let t_post = std::time::Instant::now();
+    let t_post = dbt_vfs::time::Instant::now();
     let total_batch = concat_batches_widened(schema, batches)?;
     let total_batch = normalize_result_column_names(adapter_type, sql.as_ref(), total_batch);
     log_step_duration(
@@ -472,7 +472,7 @@ pub(crate) fn adbc_execute_with_options(
         t_post.elapsed(),
     );
 
-    let t_status = std::time::Instant::now();
+    let t_status = dbt_vfs::time::Instant::now();
     record_current_span_status_from_attrs(|attrs| {
         if let Some(attrs) = attrs.downcast_mut::<QueryExecuted>() {
             attrs.dbt_core_event_code = "E017".to_string();
@@ -482,7 +482,7 @@ pub(crate) fn adbc_execute_with_options(
     });
     log_step_duration("record_current_span_status_from_attrs", t_status.elapsed());
 
-    let t_guard_drop = std::time::Instant::now();
+    let t_guard_drop = dbt_vfs::time::Instant::now();
     drop(query_span_guard);
     log_step_duration(
         "drop(query_span_guard) (span exit/export)",

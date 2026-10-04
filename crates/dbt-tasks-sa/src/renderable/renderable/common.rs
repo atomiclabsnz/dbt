@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use std::sync::mpsc;
-use std::time::SystemTime;
 
 use dbt_common::FsResult;
 use dbt_common::collections::DashMap;
@@ -19,7 +18,7 @@ pub fn handle_render_result(
     ctx: &mut TaskRunnerCtx,
     result_sender: &Option<mpsc::SyncSender<TaskResult>>,
 ) -> FsResult<NodeStatus> {
-    let start = SystemTime::now();
+    let start = dbt_vfs::time::system_now();
     let (sql_instruction, config_map) = match res {
         Err(err) => {
             let thread_id = ctx.thread_id;

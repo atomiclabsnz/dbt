@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    time::SystemTime,
-};
+use std::collections::{BTreeMap, HashMap};
 
 use chrono::{DateTime, Utc};
 use dbt_adapter::response::AdapterResponse;
@@ -21,7 +18,7 @@ pub fn build_run_results_artifact(
     adapter_responses: &HashMap<String, AdapterResponse>,
     arg: &EvalArgs,
 ) -> RunResultsArtifact {
-    let now = SystemTime::now();
+    let now = dbt_vfs::time::system_now();
     let generated_at: DateTime<Utc> = DateTime::from(now);
 
     let results: Vec<RunResultOutput> = stats

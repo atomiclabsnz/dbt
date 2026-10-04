@@ -1,8 +1,8 @@
 use dbt_vfs::PathExt as _;
+use dbt_vfs::time::{Duration, Instant, SystemTime};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime};
 
 use dbt_adapter::load_store::ResultStore;
 use dbt_adapter::{
@@ -691,7 +691,7 @@ impl<'a> AllPhasesExecutor<'a> {
         feature_stack: Arc<FeatureStack>,
         task_runner_hooks_factory: Arc<dyn TaskRunnerHooksFactory>,
     ) -> Self {
-        let start = SystemTime::now();
+        let start = dbt_vfs::time::system_now();
         let jinja_type_checking_event_listener_factory = feature_stack
             .jinja
             .factory
@@ -1211,7 +1211,7 @@ impl<'a> AllPhasesExecutor<'a> {
                         // exits (list, format, lint, schedule, source freshness) carry an
                         // exit_status and must not produce spurious "Compilation Error" results.
                         if err.exit_status().is_none() {
-                            let now = SystemTime::now();
+                            let now = dbt_vfs::time::system_now();
                             let error_stats = dbt_schemas::stats::Stats {
                                 stats: schedule
                                     .selected_nodes
@@ -2369,117 +2369,127 @@ async fn fetch_catalog_data(
         let progress_tracker_clone = progress_tracker.clone();
 
         let cur_span = Span::current();
-        let handle = std::thread::Builder::new()
-            .stack_size(8 * 1024 * 1024)
-            .spawn(move || -> FsResult<()> {
-                let _sp = cur_span.enter();
-                // Worker loop: process tasks until queue is empty
-                loop {
-                    let task = task_queue_clone.lock().unwrap().pop();
-                    let Some((database, schema)) = task else {
-                        // No available work - remove from progress tracker and exit
-                        progress_tracker_clone.lock().unwrap().remove(&worker_id);
-                        break;
-                    };
-                    let schema_clone = schema.clone();
+        let worker = move || -> FsResult<()> {
+            let _sp = cur_span.enter();
+            // Worker loop: process tasks until queue is empty
+            loop {
+                let task = task_queue_clone.lock().unwrap().pop();
+                let Some((database, schema)) = task else {
+                    // No available work - remove from progress tracker and exit
+                    progress_tracker_clone.lock().unwrap().remove(&worker_id);
+                    break;
+                };
+                let schema_clone = schema.clone();
 
-                    // Update progress tracker with current schema and timestamp
-                    progress_tracker_clone
-                        .lock()
-                        .unwrap()
-                        .insert(worker_id, (schema_clone.clone(), Instant::now()));
+                // Update progress tracker with current schema and timestamp
+                progress_tracker_clone
+                    .lock()
+                    .unwrap()
+                    .insert(worker_id, (schema_clone.clone(), Instant::now()));
 
-                    // CRITICAL: Create a fresh ResultStore for EACH schema iteration to ensure
-                    // complete isolation. The `run_query` macro uses a hardcoded name "run_query_statement"
-                    // for store_result/load_result. By creating a fresh ResultStore for each schema,
-                    // we ensure that:
-                    // 1. No state leaks between different schemas processed by the same worker
-                    // 2. No possibility of race conditions with other workers
-                    // 3. Each macro invocation has a completely clean ResultStore
-                    let iteration_result_store = ResultStore::default();
-                    let mut iteration_context = base_context.clone();
-                    iteration_context.insert(
-                        "store_result".to_owned(),
-                        Value::from_function(iteration_result_store.store_result()),
-                    );
-                    iteration_context.insert(
-                        "load_result".to_owned(),
-                        Value::from_function(iteration_result_store.load_result()),
-                    );
-                    iteration_context.insert(
-                        "store_raw_result".to_owned(),
-                        Value::from_function(iteration_result_store.store_raw_result()),
-                    );
+                // CRITICAL: Create a fresh ResultStore for EACH schema iteration to ensure
+                // complete isolation. The `run_query` macro uses a hardcoded name "run_query_statement"
+                // for store_result/load_result. By creating a fresh ResultStore for each schema,
+                // we ensure that:
+                // 1. No state leaks between different schemas processed by the same worker
+                // 2. No possibility of race conditions with other workers
+                // 3. Each macro invocation has a completely clean ResultStore
+                let iteration_result_store = ResultStore::default();
+                let mut iteration_context = base_context.clone();
+                iteration_context.insert(
+                    "store_result".to_owned(),
+                    Value::from_function(iteration_result_store.store_result()),
+                );
+                iteration_context.insert(
+                    "load_result".to_owned(),
+                    Value::from_function(iteration_result_store.load_result()),
+                );
+                iteration_context.insert(
+                    "store_raw_result".to_owned(),
+                    Value::from_function(iteration_result_store.store_raw_result()),
+                );
 
-                    // Lookup relations for this schema
-                    let rels = relations_map_clone
-                        .get(&(database.clone(), schema.clone()))
-                        .expect("schema must exist in relations map");
-                    let relation_as_values = rels
-                        .iter()
-                        .map(|r| RelationObject::new(Arc::clone(r)).into_value())
-                        .collect::<Vec<Value>>();
+                // Lookup relations for this schema
+                let rels = relations_map_clone
+                    .get(&(database.clone(), schema.clone()))
+                    .expect("schema must exist in relations map");
+                let relation_as_values = rels
+                    .iter()
+                    .map(|r| RelationObject::new(Arc::clone(r)).into_value())
+                    .collect::<Vec<Value>>();
 
-                    let db_schema = RelationObject::new(Arc::from(
-                        create_relation(
-                            adapter_type,
-                            database.to_string(),
-                            schema.clone(),
-                            maybe_region_clone.clone(), // hack for BQ
-                            None,
-                            ResolvedQuoting::default(),
-                        )?,
-                    ))
-                    .into_value();
+                let db_schema = RelationObject::new(Arc::from(create_relation(
+                    adapter_type,
+                    database.to_string(),
+                    schema.clone(),
+                    maybe_region_clone.clone(), // hack for BQ
+                    None,
+                    ResolvedQuoting::default(),
+                )?))
+                .into_value();
 
-                    // To avoid blowing up the query, we use the get_catalog macro for batches with more than 50 relations
-                    let jinja_result: FsResult<Value> = if relation_as_values.len() > 50 {
-                        let args = vec![
-                            Value::from_serialize(db_schema),
-                            Value::from_serialize(vec![schema.clone()]),
-                        ];
-                        get_catalog_by_relations(
-                            &jinja_env_clone,
-                            "get_catalog",
-                            &project_name_owned,
-                            &project_name_owned,
-                            &iteration_context,
-                            &args,
-                        )
-                    } else {
-                        let args = vec![
-                            Value::from_serialize(db_schema),
-                            Value::from_serialize(relation_as_values.clone()),
-                        ];
-                        get_catalog_by_relations(
-                            &jinja_env_clone,
-                            "get_catalog_relations",
-                            &project_name_owned,
-                            &project_name_owned,
-                            &iteration_context,
-                            &args,
-                        )
-                    };
-                    match jinja_result {
-                        Ok(v) => match convert_macro_result_to_record_batch(&v) {
-                            Ok(record_batch) => {
-                                shared_results_clone.lock().unwrap().push(record_batch);
-                            }
-                            Err(e) => {
-                                let msg = format!("[Non-critical] Issue processing catalog for schema '{database}.{schema}': {e}");
-                                emit_info_log_message(&msg);
-                                shared_errors_clone.lock().unwrap().push(msg);
-                            }
-                        },
+                // To avoid blowing up the query, we use the get_catalog macro for batches with more than 50 relations
+                let jinja_result: FsResult<Value> = if relation_as_values.len() > 50 {
+                    let args = vec![
+                        Value::from_serialize(db_schema),
+                        Value::from_serialize(vec![schema.clone()]),
+                    ];
+                    get_catalog_by_relations(
+                        &jinja_env_clone,
+                        "get_catalog",
+                        &project_name_owned,
+                        &project_name_owned,
+                        &iteration_context,
+                        &args,
+                    )
+                } else {
+                    let args = vec![
+                        Value::from_serialize(db_schema),
+                        Value::from_serialize(relation_as_values.clone()),
+                    ];
+                    get_catalog_by_relations(
+                        &jinja_env_clone,
+                        "get_catalog_relations",
+                        &project_name_owned,
+                        &project_name_owned,
+                        &iteration_context,
+                        &args,
+                    )
+                };
+                match jinja_result {
+                    Ok(v) => match convert_macro_result_to_record_batch(&v) {
+                        Ok(record_batch) => {
+                            shared_results_clone.lock().unwrap().push(record_batch);
+                        }
                         Err(e) => {
-                            let msg = format!("[Non-critical] Issue fetching catalog for schema '{database}.{schema}': {e}");
+                            let msg = format!(
+                                "[Non-critical] Issue processing catalog for schema '{database}.{schema}': {e}"
+                            );
                             emit_info_log_message(&msg);
                             shared_errors_clone.lock().unwrap().push(msg);
                         }
+                    },
+                    Err(e) => {
+                        let msg = format!(
+                            "[Non-critical] Issue fetching catalog for schema '{database}.{schema}': {e}"
+                        );
+                        emit_info_log_message(&msg);
+                        shared_errors_clone.lock().unwrap().push(msg);
                     }
                 }
-                Ok(())
-            })
+            }
+            Ok(())
+        };
+        // ferrion-wasm: no threads on wasm; each worker runs inline (the first
+        // drains the whole queue, so the poll loop below sees it finished).
+        #[cfg(target_arch = "wasm32")]
+        let handle = {
+            let _ = worker();
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        let handle = std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(worker)
             .expect("failed to spawn worker thread");
         handles.push(handle);
     }
@@ -2489,7 +2499,7 @@ async fn fetch_catalog_data(
 
     // Do not await workers directly as they may lock due to ADBC issues
     loop {
-        tokio::time::sleep(POLL_INTERVAL).await;
+        dbt_vfs::time::sleep(POLL_INTERVAL).await;
 
         let tracker_snapshot = progress_tracker.lock().unwrap().clone();
 

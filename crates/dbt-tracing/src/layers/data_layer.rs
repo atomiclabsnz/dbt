@@ -13,7 +13,7 @@ use crate::{
 };
 use rand::RngCore;
 
-use std::{collections::BTreeMap, sync::atomic::AtomicU64, time::SystemTime};
+use std::{collections::BTreeMap, sync::atomic::AtomicU64};
 
 use tracing::{Level, Subscriber, span};
 use tracing_subscriber::{
@@ -381,7 +381,7 @@ where
         // Determine the context for this span: either this span provides it, or we inherit from parent
         let this_ctx = attributes.inner().context().or(parent_ctx);
 
-        let start_time = SystemTime::now();
+        let start_time = dbt_vfs::time::system_now();
         let severity_number = metadata.level().into();
 
         let mut record = SpanStartInfo {
@@ -632,7 +632,7 @@ where
                     self.next_span_id(),
                     None,
                     None, // No links in fallback case
-                    SystemTime::now(),
+                    dbt_vfs::time::system_now(),
                     severity_number,
                     severity_number.as_str().to_string(),
                     // Fallback. Should not happen: spans should have a start record by close time.
@@ -681,7 +681,7 @@ where
                 parent_span_id,
                 links,
                 start_time_unix_nano,
-                end_time_unix_nano: SystemTime::now(),
+                end_time_unix_nano: dbt_vfs::time::system_now(),
                 severity_number,
                 severity_text,
                 status,
@@ -847,7 +847,7 @@ where
             attributes.inner_mut().with_context(&ctx_val);
         }
 
-        let time_unix_nano = SystemTime::now();
+        let time_unix_nano = dbt_vfs::time::system_now();
 
         let mut log_record = LogRecordInfo {
             time_unix_nano,

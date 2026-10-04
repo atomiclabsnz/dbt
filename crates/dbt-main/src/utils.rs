@@ -23,7 +23,7 @@ pub struct InvocationContext {
     profile_name: Option<String>,
     git_sha: Option<String>,
     git_branch: Option<String>,
-    start: std::time::Instant,
+    start: dbt_vfs::time::Instant,
 }
 
 impl InvocationContext {
@@ -53,7 +53,7 @@ impl InvocationContext {
                 .as_ref()
                 .map(|g| g.branch.clone())
                 .filter(|s| !s.is_empty()),
-            start: std::time::Instant::now(),
+            start: dbt_vfs::time::Instant::now(),
         }
     }
 

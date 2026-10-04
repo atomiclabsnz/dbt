@@ -472,8 +472,8 @@ fn write_metadata_parquet_impl(
 
     let alive_node_count = manifest.nodes.len();
 
-    let t_write = std::time::Instant::now();
-    let errors: Vec<String> = std::thread::scope(|s| {
+    let t_write = dbt_vfs::time::Instant::now();
+    let errors: Vec<String> = dbt_vfs::thread::scope(|s| {
         let t_cll = s.spawn(|| {
             let cll_rows: Vec<dbt_metadata_parquet::cll_epoch::CllRow> = cll_edges
                 .iter()

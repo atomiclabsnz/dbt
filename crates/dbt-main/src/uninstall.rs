@@ -150,7 +150,7 @@ pub async fn exec_uninstall() -> FsResult<()> {
         {
             Ok(_child) => {
                 // Wait briefly to ensure PowerShell starts
-                std::thread::sleep(std::time::Duration::from_millis(100));
+                dbt_vfs::thread::sleep(std::time::Duration::from_millis(100));
                 // Exit dbt to release the file lock
                 std::process::exit(0);
             }

@@ -15,6 +15,7 @@
 //!   overwritten, so it can grow quite large!
 // ferrion-wasm: there is no sender worker thread on wasm; what it leaves unused is allowed on wasm only.
 #![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports, unused_mut))]
+use dbt_vfs::time::{Duration, Instant};
 use std::any::Any;
 use std::fs;
 use std::io::{self, Write as _};
@@ -23,7 +24,6 @@ use std::sync::{Mutex, mpsc};
 #[cfg(not(target_arch = "wasm32"))]
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
 
 use http::HeaderValue;
 use pbjson_types::Timestamp;
@@ -511,8 +511,8 @@ impl VortexProducerClient {
 
     #[cfg(not(test))]
     fn current_timestamp() -> Timestamp {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let now = SystemTime::now()
+        use std::time::UNIX_EPOCH;
+        let now = dbt_vfs::time::system_now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or(Duration::ZERO);
         Timestamp {

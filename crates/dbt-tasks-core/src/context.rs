@@ -1,10 +1,10 @@
+use dbt_vfs::time::Instant;
 use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI64};
-use std::time::Instant;
 
 use crate::run_cache::run_cache_service::{
     CachedTestExecutionResult, HeuristicClock, TelemetryDispatcher,

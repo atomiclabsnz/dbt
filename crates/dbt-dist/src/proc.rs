@@ -3,10 +3,10 @@
 //! on `PATH`, so a probe must never be allowed to hang the caller forever
 //! just because the program it invoked is badly behaved.
 
+use dbt_vfs::time::{Duration, Instant};
 use std::{
     io::Read,
     process::{Child, Command, Stdio},
-    time::{Duration, Instant},
 };
 
 /// Outcome of running an external command. The runner itself returns `None`
@@ -104,7 +104,7 @@ fn wait_with_deadline(child: &mut Child, timeout: Duration) -> Option<std::proce
         if remaining.is_zero() {
             return None;
         }
-        std::thread::sleep(POLL_INTERVAL.min(remaining));
+        dbt_vfs::thread::sleep(POLL_INTERVAL.min(remaining));
     }
 }
 

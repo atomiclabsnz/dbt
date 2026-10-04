@@ -120,7 +120,7 @@ impl ConnectionRetryPolicy {
                         None => self.backoff.delay_before_next_attempt(attempt + 1),
                     };
                     if !delay.is_zero() {
-                        std::thread::sleep(delay);
+                        dbt_vfs::thread::sleep(delay);
                     }
                     attempt += 1;
                 }

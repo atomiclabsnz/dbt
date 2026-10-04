@@ -17,6 +17,7 @@ path = "src/lib.rs"
 doctest = false
 
 [dependencies]
+dbt-vfs = { workspace = true }
 base64 = { workspace = true }
 dbt-fusion-workspace-hack = { version = "0.1" }
 dbt-schemas = { workspace = true }
