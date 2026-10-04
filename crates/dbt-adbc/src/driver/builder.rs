@@ -5,7 +5,9 @@
 use std::sync::Arc;
 
 use super::LoadStrategy;
-use crate::{Backend, Driver, driver::AdbcDriver, semaphore::Semaphore};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::driver::AdbcDriver;
+use crate::{Backend, Driver, semaphore::Semaphore};
 #[allow(unused_imports)]
 use adbc_core::{
     error::{Error, Result, Status},
@@ -57,6 +59,7 @@ impl Builder {
     }
 
     /// Try to load the [`Driver`] using the values provided to this builder.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn try_load(&self) -> Result<Box<dyn Driver>> {
         let adbc_driver = AdbcDriver::try_load_dynamic(
             self.backend,
@@ -66,6 +69,19 @@ impl Builder {
         )?;
         let driver = Box::new(adbc_driver);
         Ok(driver)
+    }
+
+    /// ferrion-wasm: there is no ADBC driver manager on wasm (it loads native
+    /// shared libraries). An embedder supplies its own `AdapterEngine` instead.
+    #[cfg(target_arch = "wasm32")]
+    pub fn try_load(&self) -> Result<Box<dyn Driver>> {
+        Err(adbc_core::error::Error::with_message_and_status(
+            format!(
+                "ADBC driver loading is not available on wasm (backend: {})",
+                self.backend
+            ),
+            adbc_core::error::Status::NotImplemented,
+        ))
     }
 }
 

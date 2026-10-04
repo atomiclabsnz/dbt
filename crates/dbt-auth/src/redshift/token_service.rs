@@ -7,8 +7,16 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
+#[cfg(not(target_arch = "wasm32"))]
 use ureq::http::header::{HeaderName, HeaderValue};
+#[cfg(not(target_arch = "wasm32"))]
 use ureq::{Agent, Body, Error as UreqError, http};
+
+#[cfg(not(target_arch = "wasm32"))]
+type HttpError = UreqError;
+/// ferrion-wasm: no ureq on wasm; the variant still exists so callers match it.
+#[cfg(target_arch = "wasm32")]
+type HttpError = String;
 
 #[derive(Clone, Debug)]
 struct CachedToken {
@@ -30,7 +38,7 @@ pub enum TokenServiceError {
     RateLimited,
 
     #[error("HTTP request failed: {0}")]
-    Http(UreqError),
+    Http(HttpError),
 
     #[error("Invalid header name: {0}")]
     InvalidHeaderName(String),
@@ -76,17 +84,20 @@ pub trait TokenService: Send + Sync {
     fn build_headers(&self) -> Result<HashMap<String, String>, TokenServiceError>;
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub struct BaseTokenService {
     agent: Agent,
     endpoint: TokenEndpoint,
 }
 
 #[derive(Debug, PartialEq, Eq)]
+#[cfg(not(target_arch = "wasm32"))]
 struct ParsedTokenResponse {
     token: String,
     expires_in: u64,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl BaseTokenService {
     pub fn new(endpoint: TokenEndpoint) -> Result<Self, TokenServiceError> {
         endpoint.validate()?;
@@ -161,6 +172,7 @@ impl BaseTokenService {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn validate_headers(headers: &HashMap<String, String>) -> Result<(), TokenServiceError> {
     for (k, v) in headers {
         HeaderName::from_bytes(k.as_bytes())
@@ -172,6 +184,7 @@ fn validate_headers(headers: &HashMap<String, String>) -> Result<(), TokenServic
     Ok(())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn classify_response_status(status: u16) -> Result<(), TokenServiceError> {
     if status == 429 {
         return Err(TokenServiceError::RateLimited);
@@ -183,6 +196,7 @@ fn classify_response_status(status: u16) -> Result<(), TokenServiceError> {
     Ok(())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn parse_token_response(bytes: &[u8]) -> Result<ParsedTokenResponse, TokenServiceError> {
     let json: Value = serde_json::from_slice(bytes).map_err(|_| TokenServiceError::MissingToken)?;
 
@@ -200,10 +214,12 @@ fn parse_token_response(bytes: &[u8]) -> Result<ParsedTokenResponse, TokenServic
     Ok(ParsedTokenResponse { token, expires_in })
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub struct OktaIdpTokenService {
     base: BaseTokenService,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl TokenService for OktaIdpTokenService {
     fn handle_request(&self) -> Result<String, TokenServiceError> {
         let headers = self.build_headers()?;
@@ -234,10 +250,12 @@ impl TokenService for OktaIdpTokenService {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub struct EntraIdpTokenService {
     base: BaseTokenService,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl TokenService for EntraIdpTokenService {
     fn handle_request(&self) -> Result<String, TokenServiceError> {
         let headers = self.build_headers()?;
@@ -255,6 +273,7 @@ impl TokenService for EntraIdpTokenService {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn create_token_service_client(
     endpoint: TokenEndpoint,
 ) -> Result<Box<dyn TokenService + Send + Sync>, TokenServiceError> {
@@ -267,6 +286,18 @@ pub fn create_token_service_client(
         })),
         _ => Err(TokenServiceError::UnsupportedProvider(endpoint.r#type)),
     }
+}
+
+/// ferrion-wasm: the IdP token exchange is a blocking ureq call; there is no
+/// blocking HTTP client in a browser.
+#[cfg(target_arch = "wasm32")]
+pub fn create_token_service_client(
+    endpoint: TokenEndpoint,
+) -> Result<Box<dyn TokenService + Send + Sync>, TokenServiceError> {
+    Err(TokenServiceError::UnsupportedProvider(format!(
+        "{} (IdP token exchange is not available on wasm)",
+        endpoint.r#type
+    )))
 }
 
 #[cfg(test)]

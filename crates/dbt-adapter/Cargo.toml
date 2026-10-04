@@ -62,7 +62,6 @@ similar = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracy-client = { workspace = true }
-ureq = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
@@ -81,3 +80,9 @@ tempfile = { workspace = true }
 name = "dbt_adapter"
 path = "src/lib.rs"
 doctest = false
+
+# ferrion-wasm: ureq (blocking HTTP, rustls `UnixTime::now`) is native only; it
+# backs the Databricks Python-model submission client.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ureq = { workspace = true }
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

@@ -2,6 +2,7 @@
 //!
 //!
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::driver_manager::ManagedDatabase as ManagedAdbcDatabase;
 use adbc_core::{
     Database as _, Optionable,
@@ -25,9 +26,10 @@ use std::{
 use tracy_client::span;
 
 use crate::{
-    Backend, Connection, connection::AdbcConnection, semaphore::Semaphore, snowflake,
-    str_from_sqlstate,
+    Backend, Connection, semaphore::Semaphore, snowflake, str_from_sqlstate,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use crate::connection::AdbcConnection;
 
 mod builder;
 pub use builder::*;
@@ -135,13 +137,16 @@ impl Clone for Box<dyn Database> {
 }
 
 #[derive(Deserialize, Debug)]
+#[cfg(not(target_arch = "wasm32"))]
 struct RefreshResponse {
     access_token: String,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 const REFRESH_TOKEN_REQ_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
+#[cfg(not(target_arch = "wasm32"))]
 struct TokenRefresher {
     http_agent: ureq::Agent,
     token_request_url: String,
@@ -149,6 +154,7 @@ struct TokenRefresher {
     refresh_token: String,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl TokenRefresher {
     pub fn new(
         client_id: String,
@@ -241,6 +247,7 @@ impl TokenRefresher {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 struct InnerAdbcDatabase {
     pub(crate) backend: Backend,
     /// Readers-writer lock to protect the database state.
@@ -251,6 +258,7 @@ struct InnerAdbcDatabase {
     token_refresher: Option<TokenRefresher>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl InnerAdbcDatabase {
     fn new_with_refresher(
         backend: Backend,
@@ -392,11 +400,13 @@ impl InnerAdbcDatabase {
 ///
 /// Databases hold state shared by multiple connections. Generally, this means common
 /// configuration and caches.
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) struct AdbcDatabase {
     inner: Arc<InnerAdbcDatabase>,
     semaphore: Option<Arc<Semaphore>>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl AdbcDatabase {
     pub fn new(
         backend: Backend,
@@ -415,6 +425,7 @@ impl AdbcDatabase {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl DatabaseInfo for AdbcDatabase {
     fn get_info(&mut self, info_code: InfoCode) -> Result<Arc<dyn Array>> {
         let conn = self.new_connection()?;
@@ -439,6 +450,7 @@ impl DatabaseInfo for AdbcDatabase {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Database for AdbcDatabase {
     fn new_connection(&mut self) -> Result<Box<dyn Connection>> {
         let opts = Vec::new();

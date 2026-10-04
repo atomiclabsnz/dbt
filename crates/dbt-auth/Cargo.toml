@@ -27,8 +27,12 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }
 thiserror = { workspace = true }
-ureq = { workspace = true }
 url = { workspace = true }
+
+# ferrion-wasm: ureq (blocking HTTP over rustls/std::net) is native only. It
+# backs Databricks azure-tenant discovery and the Redshift IdP token exchange.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ureq = { workspace = true }
 
 [dev-dependencies]
 arrow-array = { workspace = true }

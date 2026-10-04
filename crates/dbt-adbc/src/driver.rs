@@ -3,8 +3,11 @@
 //!
 
 use crate::Database;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::database::AdbcDatabase;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::driver_manager::ManagedDriver as ManagedAdbcDriver;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::install::{self, DriverTriplet, build_http_agent};
 use crate::semaphore::Semaphore;
 use adbc_core::{
@@ -20,6 +23,7 @@ use std::{
 use std::{hash, sync::Arc};
 
 #[cfg(debug_assertions)]
+#[cfg(not(target_arch = "wasm32"))]
 use {crate::env_var::env_var_bool, std::io::ErrorKind, std::process::Command};
 
 mod builder;
@@ -170,12 +174,14 @@ pub trait Driver {
 
 /// A key used to cache loaded ADBC drivers.
 #[derive(PartialEq, Eq)]
+#[cfg(not(target_arch = "wasm32"))]
 struct AdbcDriverKey {
     backend: Backend,
     adbc_version: AdbcVersion,
     load_strategy: mem::Discriminant<LoadStrategy>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl hash::Hash for AdbcDriverKey {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.backend.hash(state);
@@ -184,12 +190,14 @@ impl hash::Hash for AdbcDriverKey {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub struct DriverFilenameDisplay<'a> {
     pub name: &'a str,
     /// OS, arch, and version (all optional).
     pub triplet: DriverTriplet<'a>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl<'a> fmt::Display for DriverFilenameDisplay<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let prefix = self.triplet.dll_prefix();
@@ -210,6 +218,7 @@ impl<'a> fmt::Display for DriverFilenameDisplay<'a> {
 /// Only runs when `DISABLE_CDN_DRIVER_CACHE` is set and `DISABLE_AUTO_DRIVER_REBUILD`
 /// is unset.
 #[cfg(debug_assertions)]
+#[cfg(not(target_arch = "wasm32"))]
 fn rebuild_drivers(dir: &PathBuf) -> Result<()> {
     let needs_rebuild = match Command::new("make").arg("-C").arg(dir).arg("-q").status() {
         Ok(s) => s.code() == Some(1),
@@ -261,6 +270,7 @@ pub fn find_upward_dir(start: &Path, subpath: &Path, max_hops: usize) -> Option<
 }
 
 /// Climb up the directory tree and returns the first lib/ directory found.
+#[cfg(not(target_arch = "wasm32"))]
 fn find_adbc_libs_directory() -> Option<PathBuf> {
     // No. of dirs to walk is chosen for `dbt` to operate when the invoked dbt project is:
     // * a subdir of the fusion root but not past the crate level
@@ -308,18 +318,22 @@ fn find_adbc_libs_directory() -> Option<PathBuf> {
 }
 
 /// Directory used by [`AdbcDriver::load_dynamic_from_name`].
+#[cfg(not(target_arch = "wasm32"))]
 static ADBC_LIBS_DIRECTORY: LazyLock<Option<PathBuf>> = LazyLock::new(find_adbc_libs_directory);
 /// All loaded ADBC drivers are cached in `LOADED_ADBC_DRIVERS`, no matter the loading strategy used.
+#[cfg(not(target_arch = "wasm32"))]
 static LOADED_ADBC_DRIVERS: LazyLock<
     parking_lot::RwLock<HashMap<AdbcDriverKey, Result<ManagedAdbcDriver>>>,
 > = LazyLock::new(|| parking_lot::RwLock::new(HashMap::new()));
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) struct AdbcDriver {
     backend: Backend,
     driver: ManagedAdbcDriver,
     semaphore: Option<Arc<Semaphore>>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl AdbcDriver {
     /// Returns an ADBC [`Driver`] for a given [`Backend`] and [`AdbcVersion`].
     pub fn try_load_dynamic(
@@ -560,6 +574,7 @@ be found."
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Driver for AdbcDriver {
     fn new_database(&mut self) -> Result<Box<dyn Database>> {
         let managed_database = self.driver.new_database()?;

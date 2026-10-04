@@ -1,6 +1,22 @@
 use std::fmt;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+/// ferrion-wasm: `atomic-wait` is futex/ulock/WaitOnAddress only. A browser
+/// wasm module without shared memory is single-threaded, so a wait on a value
+/// nobody else can change is a deadlock: refuse it loudly instead of spinning.
+#[cfg(target_arch = "wasm32")]
+mod atomic_wait {
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    pub fn wake_all(_atomic: &AtomicU32) {}
+
+    pub fn wait(atomic: &AtomicU32, value: u32) {
+        if atomic.load(Ordering::Acquire) == value {
+            panic!("dbt-adbc semaphore would block on a single-threaded wasm target");
+        }
+    }
+}
+
 /// General-case semaphore implementation.
 ///
 /// Typical Dijkstra Semaphore algorithm over atomics, wait and notify functions.

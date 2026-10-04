@@ -8,11 +8,19 @@ use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use std::cell::RefCell;
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+#[cfg(not(target_arch = "wasm32"))]
 use ureq::http;
+#[cfg(not(target_arch = "wasm32"))]
 use ureq::{self, Agent, Body, Error as UreqError, RequestBuilder};
+
+/// ferrion-wasm: no blocking HTTP client in a browser. The client keeps its
+/// shape (so the Python-model code paths type-check) but every request fails.
+#[cfg(target_arch = "wasm32")]
+type Agent = ();
 
 const DEFAULT_SHARED_NOTEBOOK_ROOT: &str = "/Shared/dbt_python_model";
 const USER_AGENT: &str = "dbt-fs";
@@ -43,11 +51,14 @@ impl DatabricksApiClient {
         })?;
 
         let base_url = Self::normalize_host(host.as_ref());
+        #[cfg(not(target_arch = "wasm32"))]
         let agent: Agent = Agent::config_builder()
             .http_status_as_error(false)
             .timeout_global(Some(Duration::from_secs(REQUEST_TIMEOUT_SECS)))
             .build()
             .into();
+        #[cfg(target_arch = "wasm32")]
+        let agent: Agent = ();
 
         Ok(Self {
             agent,
@@ -203,6 +214,7 @@ impl DatabricksApiClient {
         Ok(response.user_name)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn post_json<T: DeserializeOwned>(
         &self,
         path: &str,
@@ -217,6 +229,7 @@ impl DatabricksApiClient {
         self.parse_json_response(response)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn post_json_noop(&self, path: &str, body: serde_json::Value) -> AdapterResult<()> {
         let url = self.full_url(path);
         let request = self.configure_request(self.agent.post(&url), true);
@@ -227,6 +240,7 @@ impl DatabricksApiClient {
         self.consume_response(response)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn get<T: DeserializeOwned>(
         &self,
         path: &str,
@@ -246,10 +260,46 @@ impl DatabricksApiClient {
         self.parse_json_response(response)
     }
 
+    #[cfg(target_arch = "wasm32")]
+    fn wasm_unavailable(&self, path: &str) -> AdapterError {
+        AdapterError::new(
+            AdapterErrorKind::NotSupported,
+            format!(
+                "Databricks API request {} is not available on wasm",
+                self.full_url(path)
+            ),
+        )
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn post_json<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        _body: serde_json::Value,
+    ) -> AdapterResult<T> {
+        let _ = &self.agent;
+        Err(self.wasm_unavailable(path))
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn post_json_noop(&self, path: &str, _body: serde_json::Value) -> AdapterResult<()> {
+        Err(self.wasm_unavailable(path))
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn get<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        _query: Option<&[(&str, &str)]>,
+    ) -> AdapterResult<T> {
+        Err(self.wasm_unavailable(path))
+    }
+
     fn full_url(&self, path: &str) -> String {
         format!("{}{}", self.base_url, path)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn configure_request<B>(
         &self,
         mut request: RequestBuilder<B>,
@@ -264,6 +314,7 @@ impl DatabricksApiClient {
         request
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn parse_json_response<T: DeserializeOwned>(
         &self,
         response: http::Response<Body>,
@@ -277,12 +328,14 @@ impl DatabricksApiClient {
         })
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn consume_response(&self, response: http::Response<Body>) -> AdapterResult<()> {
         let response = self.ensure_success(response)?;
         Self::body_to_string(response)?;
         Ok(())
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn ensure_success(
         &self,
         response: http::Response<Body>,
@@ -296,6 +349,7 @@ impl DatabricksApiClient {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn body_to_string(response: http::Response<Body>) -> AdapterResult<String> {
         let mut reader = response.into_body().into_reader();
         let mut buffer = Vec::new();
@@ -308,6 +362,7 @@ impl DatabricksApiClient {
         Ok(String::from_utf8_lossy(&buffer).to_string())
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn map_ureq_error(&self, err: UreqError) -> AdapterError {
         match err {
             UreqError::StatusCode(status) => Self::http_error(status, String::new()),

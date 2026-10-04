@@ -195,6 +195,7 @@ fn apply_connection_args(
 /// client-secret credentials won't activate without a tenant, so we resolve it here
 /// (in dbt-auth) rather than depend on the driver. Used only when `azure_tenant_id`
 /// is not supplied explicitly.
+#[cfg(not(target_arch = "wasm32"))]
 fn discover_azure_tenant_id(host: &str) -> Result<String, AuthError> {
     let login_url = format!("https://{host}/aad/auth");
     // The tenant is in the 3xx Location header; do not follow the redirect, and
@@ -223,6 +224,15 @@ fn discover_azure_tenant_id(host: &str) -> Result<String, AuthError> {
             ))
         })?;
     parse_azure_tenant_from_location(location)
+}
+
+/// ferrion-wasm: no blocking HTTP client in a browser; set `azure_tenant_id`.
+#[cfg(target_arch = "wasm32")]
+fn discover_azure_tenant_id(host: &str) -> Result<String, AuthError> {
+    Err(AuthError::config(format!(
+        "azure tenant discovery for {host} is not available on wasm; \
+         set 'azure_tenant_id' explicitly"
+    )))
 }
 
 /// Extract the tenant id from an Entra ID authorize URL of the form

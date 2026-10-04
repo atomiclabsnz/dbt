@@ -6,6 +6,7 @@ use core::fmt;
 use std::collections::HashSet;
 use std::sync::Arc;
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::driver_manager::ManagedConnection as ManagedAdbcConnection;
 use adbc_core::options;
 use adbc_core::{
@@ -17,6 +18,7 @@ use arrow_array::RecordBatchReader;
 use arrow_schema::Schema;
 
 use crate::semaphore::Semaphore;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::statement::AdbcStatement;
 use crate::{Backend, Statement};
 
@@ -383,6 +385,7 @@ impl fmt::Debug for dyn Connection {
 /// created by a [`Database`] instance and are used to execute SQL queries and
 /// manage transactions.
 #[allow(dead_code)]
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) struct AdbcConnection(
     pub(crate) Backend,
     pub(crate) ManagedAdbcConnection,
@@ -391,12 +394,14 @@ pub(crate) struct AdbcConnection(
     pub(crate) u64,
 );
 
+#[cfg(not(target_arch = "wasm32"))]
 impl fmt::Debug for AdbcConnection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "AdbcConnection({:?}, ManagedAdbcConnection)", self.0)
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Drop for AdbcConnection {
     fn drop(&mut self) {
         // TODO(backpressure): re-enable once re-entrancy is handled.
@@ -406,6 +411,7 @@ impl Drop for AdbcConnection {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Connection for AdbcConnection {
     fn fingerprint(&self) -> u64 {
         self.3

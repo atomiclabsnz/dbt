@@ -4,6 +4,7 @@
 
 use std::fmt;
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::driver_manager::ManagedStatement as ManagedAdbcStatement;
 use adbc_core::{
     Optionable, PartitionedResult, Statement as _,
@@ -143,8 +144,10 @@ impl fmt::Debug for dyn Statement {
 
 /// ADBC Statement.
 #[allow(dead_code)]
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) struct AdbcStatement(pub(crate) Backend, pub(crate) ManagedAdbcStatement);
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Statement for AdbcStatement {
     fn bind(&mut self, batch: RecordBatch) -> Result<()> {
         self.1.bind(batch)
