@@ -25,7 +25,12 @@ pub fn run_future_with_ctrlc_support<'a>(
         // Windows) and the fail-fast signal (triggered by critical errors in
         // any task). We listen to both signals concurrently and trigger the
         // same cancellation logic.
+        #[cfg(not(target_arch = "wasm32"))]
         let ctrl_c = tokio::signal::ctrl_c();
+        // ferrion-wasm: there are no OS signals on wasm; only fail-fast or the
+        // cancellation token can stop the run.
+        #[cfg(target_arch = "wasm32")]
+        let ctrl_c = futures::future::pending::<std::io::Result<()>>();
         debug_assert!(
             !fail_fast_flag || !fail_fast.has_triggered(),
             "run_future_with_ctrlc_support called with fail-fast already triggered"

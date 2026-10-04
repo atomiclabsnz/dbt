@@ -3,8 +3,27 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::fs;
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::io::AsyncWriteExt;
+
+/// ferrion-wasm: tokio::fs is refused on wasm; the same calls run std::fs inline.
+#[cfg(target_arch = "wasm32")]
+mod fs {
+    use std::io;
+    use std::path::Path;
+
+    pub async fn read_to_string(p: impl AsRef<Path>) -> io::Result<String> {
+        std::fs::read_to_string(p)
+    }
+    pub async fn remove_file(p: impl AsRef<Path>) -> io::Result<()> {
+        std::fs::remove_file(p)
+    }
+    pub async fn create_dir_all(p: impl AsRef<Path>) -> io::Result<()> {
+        std::fs::create_dir_all(p)
+    }
+}
 
 use crate::auth::browser_flow::TokenResponse;
 use crate::auth::scope::{Scope, jwt_claims};
@@ -133,13 +152,14 @@ impl TokenStore {
             RunCacheServiceError::Auth(format!("failed to serialize auth token: {err}"))
         })?;
 
-        let mut file = open_for_write(&self.path).await.map_err(|err| {
-            RunCacheServiceError::Auth(format!("failed to write {}: {err}", self.path.display()))
-        })?;
-        file.write_all(json.as_bytes()).await.map_err(|err| {
-            RunCacheServiceError::Auth(format!("failed to write {}: {err}", self.path.display()))
-        })?;
-        Ok(())
+        write_token_file(&self.path, json.as_bytes())
+            .await
+            .map_err(|err| {
+                RunCacheServiceError::Auth(format!(
+                    "failed to write {}: {err}",
+                    self.path.display()
+                ))
+            })
     }
 
     pub async fn delete(&self) -> Result<(), RunCacheServiceError> {
@@ -154,6 +174,17 @@ impl TokenStore {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+async fn write_token_file(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    let mut file = open_for_write(path).await?;
+    file.write_all(contents).await
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn write_token_file(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    std::fs::write(path, contents)
+}
+
 #[cfg(unix)]
 async fn open_for_write(path: &Path) -> std::io::Result<fs::File> {
     fs::OpenOptions::new()
@@ -165,7 +196,7 @@ async fn open_for_write(path: &Path) -> std::io::Result<fs::File> {
         .await
 }
 
-#[cfg(not(unix))]
+#[cfg(all(not(unix), not(target_arch = "wasm32")))]
 async fn open_for_write(path: &Path) -> std::io::Result<fs::File> {
     fs::OpenOptions::new()
         .create(true)

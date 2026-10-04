@@ -484,7 +484,8 @@ pub async fn load(
         )?;
     }
 
-    let (packages_lock, upstream_projects) = get_or_install_packages(
+    // ferrion-wasm: the deps future (hub HTTP, git hosts) is !Send on wasm.
+    let (packages_lock, upstream_projects) = dbt_common::send_on_wasm::send_on_wasm(get_or_install_packages(
         &arg.io,
         arg.command,
         &env,
@@ -501,7 +502,7 @@ pub async fn load(
         use_v2_compatible_package_downloads,
         private_package_resolver,
         dbt_state.cloud_config.clone(),
-    )
+    ))
     .await?;
 
     // Skip downloading publication artifacts in Time Machine replay mode

@@ -110,6 +110,13 @@ pub use install::pre_install_all_drivers;
 #[cfg(not(target_arch = "wasm32"))]
 pub use install::pre_install_driver;
 
+/// ferrion-wasm: there is no driver installer on wasm (no dlopen, no ureq);
+/// `dbt system install-drivers` fails with this error.
+#[cfg(target_arch = "wasm32")]
+pub fn pre_install_all_drivers() -> Result<(), &'static str> {
+    Err("ADBC driver installation is unavailable on wasm")
+}
+
 /// Encapsulates connection creation, recycling, and concurrency limits.
 pub trait ConnectionFactory: Send + Sync {
     type Error;

@@ -1,3 +1,6 @@
+// ferrion-wasm: the multi-thread runtime sizing constants are native only; what it leaves unused is allowed on wasm only.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports))]
+
 use crate::ctrl_c::run_future_with_ctrlc_support;
 use clap::error::ErrorKind;
 use dbt_clap_core::Cli;
@@ -124,6 +127,14 @@ pub fn run_cli_with_code(cli: Box<Cli>, arg: SystemArgs, feature_stack: Arc<Feat
     // Only `--no-parallel` pins the tokio runtime to a single worker.
     // `--threads` is exclusively the adapter connection-backpressure knob
     // and does not affect the runtime.
+    // ferrion-wasm: there are no threads on wasm; everything runs on a
+    // current-thread runtime regardless of `--no-parallel`.
+    #[cfg(target_arch = "wasm32")]
+    let tokio_rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("failed to initialize current-thread tokio runtime");
+    #[cfg(not(target_arch = "wasm32"))]
     let tokio_rt = if arg.no_parallel {
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
@@ -158,12 +169,14 @@ pub fn run_cli_with_code(cli: Box<Cli>, arg: SystemArgs, feature_stack: Arc<Feat
     let fail_fast = feature_stack.cli.fail_fast.clone();
     let token = cst.token();
 
-    let future = tokio_rt.spawn(execute_fs_and_shutdown(
+    // ferrion-wasm: on wasm the command futures that talk HTTP (reqwest over
+    // fetch: deps, login, init, artifact upload, version check) are !Send.
+    let future = tokio_rt.spawn(dbt_common::send_on_wasm::send_on_wasm(execute_fs_and_shutdown(
         arg,
         cli,
         Arc::clone(&feature_stack),
         token,
-    ));
+    )));
     let future = Box::pin(async {
         // JoinError is produced if future panics, so we .unwrap()
         future.await.unwrap()

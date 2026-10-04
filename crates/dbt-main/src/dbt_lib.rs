@@ -335,6 +335,8 @@ async fn do_execute_fs(
     // Current versions of rustls require us to explicitly install a default provider.
     // The default provider can only be installed once per process, so
     // be defensive here (tests may use the same process)
+    // ferrion-wasm: rustls (aws-lc) is native only; wasm has no TLS of its own.
+    #[cfg(not(target_arch = "wasm32"))]
     if rustls::crypto::CryptoProvider::get_default().is_none() {
         rustls::crypto::aws_lc_rs::default_provider()
             .install_default()

@@ -1,3 +1,6 @@
+// ferrion-wasm: TOKEN_HTTP_TIMEOUT is only applied by the native HTTP client; what it leaves unused is allowed on wasm only.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports))]
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -59,10 +62,7 @@ impl std::fmt::Debug for OAuthTokenSource {
 
 impl OAuthTokenSource {
     pub fn new(config: &RunCacheServiceConfig) -> Result<Self, RunCacheServiceError> {
-        let http = reqwest::Client::builder()
-            .connect_timeout(TOKEN_HTTP_TIMEOUT)
-            .timeout(TOKEN_HTTP_TIMEOUT)
-            .build()?;
+        let http = token_http_client()?;
 
         let store = TokenStore::discover().ok_or_else(|| {
             RunCacheServiceError::Auth(
@@ -106,10 +106,7 @@ impl OAuthTokenSource {
         interactive_flow: Arc<dyn InteractiveFlow>,
         auth_chain: AuthChain,
     ) -> Result<Self, RunCacheServiceError> {
-        let http = reqwest::Client::builder()
-            .connect_timeout(TOKEN_HTTP_TIMEOUT)
-            .timeout(TOKEN_HTTP_TIMEOUT)
-            .build()?;
+        let http = token_http_client()?;
         Ok(Self {
             http,
             token_url: config.oauth_token_url.clone(),
@@ -1057,4 +1054,19 @@ projects:
         let err = source.token().await.unwrap_err();
         assert!(matches!(err, RunCacheServiceError::AuthRequest(_)));
     }
+}
+
+/// The HTTP client for token requests. ferrion-wasm: reqwest's fetch-backed
+/// client on wasm has no client-level connect/request timeouts.
+#[cfg(not(target_arch = "wasm32"))]
+fn token_http_client() -> Result<reqwest::Client, reqwest::Error> {
+    reqwest::Client::builder()
+        .connect_timeout(TOKEN_HTTP_TIMEOUT)
+        .timeout(TOKEN_HTTP_TIMEOUT)
+        .build()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn token_http_client() -> Result<reqwest::Client, reqwest::Error> {
+    reqwest::Client::builder().build()
 }

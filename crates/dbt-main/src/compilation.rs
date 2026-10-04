@@ -2417,9 +2417,9 @@ fn spawn_version_check_if_possible(
             { config.no_version_check || std::env::var("DBT_DISABLE_VERSION_CHECK").is_ok() };
         let current_version = env!("CARGO_PKG_VERSION");
         if !disable_version_check {
-            return Some(tokio::spawn(
+            return Some(tokio::spawn(dbt_common::send_on_wasm::send_on_wasm(
                 version_check::check_version(current_version, None).in_current_span(),
-            ));
+            )));
         }
     }
     None

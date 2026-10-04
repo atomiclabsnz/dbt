@@ -17,6 +17,8 @@ pub use dbt_clap_core::from_lib;
 
 pub mod partial_parse;
 pub mod uninstall;
+// ferrion-wasm: self-update (download + untar + replace the binary) is native only.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod update;
 mod utils;
 

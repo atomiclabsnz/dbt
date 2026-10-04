@@ -100,7 +100,8 @@ pub async fn execute_deps_command(
         simplified_dbt_project.flags.as_ref(),
     );
 
-    get_or_install_packages(
+    // ferrion-wasm: the deps future (hub HTTP, git hosts) is !Send on wasm.
+    dbt_common::send_on_wasm::send_on_wasm(get_or_install_packages(
         &load_args.io,
         load_args.command,
         &env,
@@ -117,7 +118,7 @@ pub async fn execute_deps_command(
         use_v2_compatible_package_downloads,
         private_package_resolver,
         cloud_config,
-    )
+    ))
     .await?;
 
     error_count_checkpoint()
