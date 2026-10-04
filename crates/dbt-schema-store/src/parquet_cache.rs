@@ -192,7 +192,7 @@ pub(crate) fn deserialize_schema(bytes: &[u8]) -> SchemaStoreResult<SchemaRef> {
 /// Lists all epoch files in `dir`, sorted ascending by epoch number.
 /// Epoch files are named `{N}.parquet`.
 fn existing_epochs(dir: &Path) -> Vec<(u32, PathBuf)> {
-    let Ok(rd) = std::fs::read_dir(dir) else {
+    let Ok(rd) = dbt_vfs::fs::read_dir(dir) else {
         return Vec::new();
     };
     let mut epochs: Vec<(u32, PathBuf)> = rd
@@ -220,10 +220,10 @@ fn next_epoch(dir: &Path) -> u32 {
 
 fn write_rows(path: &Path, rows: &[SchemaRow]) -> SchemaStoreResult<()> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
+        dbt_vfs::fs::create_dir_all(parent)
             .map_err(|e| ArrowError::IoError(format!("create_dir_all {}", parent.display()), e))?;
     }
-    let file = std::fs::File::create(path)
+    let file = dbt_vfs::fs::File::create(path)
         .map_err(|e| ArrowError::IoError(format!("create {}", path.display()), e))?;
     let props = WriterProperties::builder()
         .set_compression(Compression::ZSTD(ZstdLevel::try_new(1).unwrap()))
@@ -256,7 +256,7 @@ fn write_rows(path: &Path, rows: &[SchemaRow]) -> SchemaStoreResult<()> {
 ///
 /// When `key_filter` is `None` (e.g. compaction), all rows are read.
 fn read_rows(path: &Path, key_filter: Option<&HashSet<&str>>) -> Vec<SchemaRow> {
-    let Ok(file) = std::fs::File::open(path) else {
+    let Ok(file) = dbt_vfs::fs::File::open(path) else {
         return Vec::new();
     };
     let Ok(builder) = ParquetRecordBatchReaderBuilder::try_new(file) else {
@@ -380,13 +380,13 @@ pub(crate) fn compact_epochs(
     let target = dir.join("0.parquet");
     // On Windows, rename fails if the target exists. Remove it first.
     if cfg!(windows) {
-        let _ = std::fs::remove_file(&target);
+        let _ = dbt_vfs::fs::remove_file(&target);
     }
-    std::fs::rename(&tmp, &target)
+    dbt_vfs::fs::rename(&tmp, &target)
         .map_err(|e| ArrowError::IoError("compaction rename".to_string(), e))?;
     for (n, path) in epochs {
         if *n != 0 {
-            let _ = std::fs::remove_file(path);
+            let _ = dbt_vfs::fs::remove_file(path);
         }
     }
     Ok(())
@@ -577,7 +577,7 @@ impl ParquetSchemaCache {
         if rows.is_empty() {
             return Ok(()); // nothing new to persist
         }
-        std::fs::create_dir_all(dir)
+        dbt_vfs::fs::create_dir_all(dir)
             .map_err(|e| ArrowError::IoError(format!("create_dir_all {}", dir.display()), e))?;
         let path = dir.join(format!("{epoch_n}.parquet"));
         write_rows(&path, &rows)?;

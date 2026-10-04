@@ -19,7 +19,7 @@ pub(super) struct StateExplainInput {
 }
 
 pub fn read_explain_records(path: &Path) -> FsResult<Vec<StateExplainRecord>> {
-    std::fs::read_to_string(path)
+    dbt_vfs::fs::read_to_string(path)
         .map_err(|err| {
             fs_err!(
                 ErrorCode::IoError,
@@ -57,7 +57,7 @@ pub fn read_explain_records(path: &Path) -> FsResult<Vec<StateExplainRecord>> {
 /// Read a Fusion-native dbt State explain log from a JSONL file.
 pub fn read_state_explain_log(path: &Path) -> FsResult<StateExplainLog> {
     let mut output = StateExplainLog::default();
-    for (idx, line) in std::fs::read_to_string(path)
+    for (idx, line) in dbt_vfs::fs::read_to_string(path)
         .map_err(|err| {
             fs_err!(
                 ErrorCode::IoError,
@@ -106,7 +106,7 @@ pub fn append_state_explain_log_record(
         )
     })?;
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| {
+        dbt_vfs::fs::create_dir_all(parent).map_err(|err| {
             fs_err!(
                 ErrorCode::IoError,
                 "Failed to create {}: {err}",
@@ -114,7 +114,7 @@ pub fn append_state_explain_log_record(
             )
         })?;
     }
-    let mut file = std::fs::OpenOptions::new()
+    let mut file = dbt_vfs::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(path)
@@ -172,7 +172,7 @@ pub(super) fn fallback_records_from_log(log: StateExplainLog) -> FsResult<Vec<St
 }
 
 fn log_uses_structured_schema(path: &Path) -> FsResult<bool> {
-    let contents = std::fs::read_to_string(path).map_err(|err| {
+    let contents = dbt_vfs::fs::read_to_string(path).map_err(|err| {
         fs_err!(
             ErrorCode::IoError,
             "Failed to read {}: {err}",

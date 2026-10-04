@@ -1,3 +1,4 @@
+use dbt_vfs::PathExt as _;
 use std::path::{Path, PathBuf};
 
 use dbt_common::{ErrorCode, FsResult, constants::DBT_LOG_DIR_NAME, fs_err};
@@ -52,7 +53,7 @@ pub fn prune_state_explain_logs(new_log_path: &Path, config: &RunCacheServiceCon
 
     let files = state_explain_log_files(log_dir, log_prefix(config));
     for path in files.iter().take(files.len().saturating_sub(limit)) {
-        if let Err(err) = std::fs::remove_file(path) {
+        if let Err(err) = dbt_vfs::fs::remove_file(path) {
             tracing::warn!(
                 "Failed to prune dbt State explain log {}: {err}",
                 path.display()
@@ -68,12 +69,12 @@ pub(super) fn resolve_log_file(
     let log_dir = decision_log_dir(options, config);
 
     if let Some(log_file) = &options.log_file {
-        let path = if log_file.is_absolute() || log_file.exists() {
+        let path = if log_file.is_absolute() || log_file.vfs_exists() {
             log_file.clone()
         } else {
             log_dir.join(log_file)
         };
-        return if path.exists() {
+        return if path.vfs_exists() {
             Ok(Some(path))
         } else {
             Err(fs_err!(
@@ -119,7 +120,7 @@ fn newest_log_file(log_dir: &Path, log_prefix: &str) -> Option<PathBuf> {
 /// Log names embed a fixed-width UTC timestamp, so a lexicographic sort is
 /// chronological: oldest first.
 fn state_explain_log_files(log_dir: &Path, prefix: &str) -> Vec<PathBuf> {
-    let entries = match std::fs::read_dir(log_dir) {
+    let entries = match dbt_vfs::fs::read_dir(log_dir) {
         Ok(entries) => entries,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Vec::new(),
         Err(err) => {

@@ -771,7 +771,7 @@ pub fn write_decompiled_sql(out_dir: &Path, relative_path: &Path, sql: &str) {
     let decompiled_path = out_dir.join("decompiled").join(relative_path);
 
     if let Some(parent) = decompiled_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        let _ = dbt_vfs::fs::create_dir_all(parent);
     }
-    let _ = std::fs::write(&decompiled_path, sql);
+    let _ = dbt_vfs::fs::write(&decompiled_path, sql);
 }

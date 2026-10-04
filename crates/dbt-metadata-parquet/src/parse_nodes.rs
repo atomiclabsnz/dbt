@@ -39,7 +39,7 @@ const PROJECTED: &[&str] = &[
 ];
 
 fn read_file(path: &std::path::PathBuf) -> Vec<ParseNodeRow> {
-    let Ok(file) = std::fs::File::open(path) else {
+    let Ok(file) = dbt_vfs::fs::File::open(path) else {
         return vec![];
     };
     let Ok(builder) = ParquetRecordBatchReaderBuilder::try_new(file) else {

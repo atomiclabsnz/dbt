@@ -46,6 +46,7 @@ use dbt_tasks_core::{
     static_analysis_buckets::{StaticAnalysisBuckets, build_refresh_intervals},
     utils::{build_run_results_artifact, write_run_results_json, write_run_results_json_or_warn},
 };
+use dbt_vfs::PathExt as _;
 
 use dbt_common::{
     DiscreteEventEmitter, ErrorCode, FsResult,
@@ -1703,8 +1704,8 @@ impl DbtProjectCompilation {
         let execute_mode = Execute::from_compute_flag(arg.local_execution_backend);
 
         let clear_schema_cache_dir = |cache_dir: PathBuf| {
-            if cache_dir.exists() {
-                if let Err(e) = std::fs::remove_dir_all(&cache_dir) {
+            if cache_dir.vfs_exists() {
+                if let Err(e) = dbt_vfs::fs::remove_dir_all(&cache_dir) {
                     tracing::warn!(
                         "Failed to clear stale schema cache at {}: {}",
                         cache_dir.display(),
@@ -2687,7 +2688,7 @@ fn run_verify_partial_load(arg: &EvalArgs, schedule: &Schedule<String>) {
     // Write to DBT_VERIFY_PARTIAL_LOAD_LOG if set; otherwise fall back to tracing so
     // the result is still visible in the normal log file.
     if let Ok(path) = std::env::var("DBT_VERIFY_PARTIAL_LOAD_LOG") {
-        if let Ok(mut file) = std::fs::OpenOptions::new()
+        if let Ok(mut file) = dbt_vfs::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&path)

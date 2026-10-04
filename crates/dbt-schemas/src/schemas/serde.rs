@@ -40,7 +40,7 @@ where
             format!("Failed to convert to YAML: {e}"),
         )
     })?;
-    let file = std::fs::File::create(path).map_err(|e| {
+    let file = dbt_vfs::fs::File::create(path).map_err(|e| {
         FsError::new(
             ErrorCode::SerializationError,
             format!("Failed to create file: {e}"),

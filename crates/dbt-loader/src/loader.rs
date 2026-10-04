@@ -27,6 +27,8 @@ use dbt_schemas::schemas::serde::{StringOrInteger, yaml_to_fs_error};
 use dbt_schemas::schemas::telemetry::{ExecutionPhase, PhaseExecuted};
 use dbt_schemas::state::DbtProfile;
 use dbt_telemetry::GenericOpItemProcessed;
+use dbt_vfs::PathExt as _;
+use dbt_vfs::fs;
 use dbt_yaml;
 use fs_deps::get_or_install_packages;
 use fs_deps::private_package::PrivatePackageResolver;
@@ -37,10 +39,10 @@ use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ffi::OsStr;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
-use std::{fs, io};
 use tracing::Instrument;
 
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
@@ -250,7 +252,7 @@ pub async fn load(
 
     // Check if .gitignore exists and add dbt_internal_packages/ to it if not present
     let gitignore_path = arg.io.in_dir.join(".gitignore");
-    if gitignore_path.exists() {
+    if gitignore_path.vfs_exists() {
         let gitignore_content = fs::read_to_string(&gitignore_path)?;
         if !gitignore_content.contains(format!("{DBT_INTERNAL_PACKAGES_DIR_NAME}/").as_str()) {
             let mut updated_content = gitignore_content;
@@ -349,7 +351,7 @@ pub async fn load(
     if let Some(prev_dbt_state) = arg.prev_dbt_state.clone() {
         let prev_root_package = prev_dbt_state.root_package();
 
-        if !prev_root_package.dependencies.is_empty() && !packages_install_path.exists() {
+        if !prev_root_package.dependencies.is_empty() && !packages_install_path.vfs_exists() {
             return Err(fs_err!(
                 ErrorCode::CacheError,
                 "Packages directory does not exist",
@@ -689,7 +691,7 @@ pub async fn load_catalogs(
 /// `dbt1013` YAML errors, matching how `dbt_project.yml` handles vars.
 pub fn vars_data_from_root(project_root: &Path) -> FsResult<BTreeMap<String, dbt_yaml::Value>> {
     let vars_yml_path = project_root.join(DBT_VARS_YML);
-    if !vars_yml_path.exists() {
+    if !vars_yml_path.vfs_exists() {
         return Ok(BTreeMap::new());
     }
     let raw = value_from_file(&vars_yml_path, false, None)?;
@@ -1186,10 +1188,21 @@ fn find_files_by_kind_and_extension(
 /// Loads the .dbtignore file if it exists in the given path
 pub fn load_dbtignore(path: &Path) -> FsResult<Option<Gitignore>> {
     let dbtignore_path = path.join(".dbtignore");
-    if dbtignore_path.exists() {
+    if dbtignore_path.vfs_exists() {
         let mut builder = GitignoreBuilder::new(path);
         // add() returns Option<Error> where None means success and Some(err) is an error
-        match builder.add(&dbtignore_path) {
+        // ferrion-wasm: GitignoreBuilder::add reads the file with std::fs; read it
+        // through the VFS and add its lines instead (what add() does).
+        match fs::read_to_string(&dbtignore_path)
+            .map_err(ignore::Error::from)
+            .and_then(|text| {
+                for line in text.lines() {
+                    builder.add_line(Some(dbtignore_path.clone()), line)?;
+                }
+                Ok(())
+            })
+            .err()
+        {
             None => match builder.build() {
                 Ok(gitignore) => return Ok(Some(gitignore)),
                 Err(err) => {

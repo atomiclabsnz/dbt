@@ -77,7 +77,7 @@ impl LazyModelWrapper {
 
     /// Load the compiled SQL content (no caching - read fresh each time).
     fn load_compiled_sql(&self) -> Option<String> {
-        std::fs::read_to_string(&self.compiled_path).ok()
+        dbt_vfs::fs::read_to_string(&self.compiled_path).ok()
     }
 }
 

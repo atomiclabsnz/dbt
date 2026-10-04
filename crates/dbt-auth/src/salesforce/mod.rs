@@ -1,4 +1,4 @@
-use std::fs;
+use dbt_vfs::fs;
 
 use crate::{
     AdapterConfig, Auth, AuthError, AuthOutcome, PrivateKeySource, auth_configure_pipeline,

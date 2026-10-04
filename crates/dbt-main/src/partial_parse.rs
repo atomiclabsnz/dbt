@@ -18,6 +18,7 @@ use dbt_schemas::{
     schemas::common::ResolvedQuoting,
     state::{DbtRuntimeConfig, DbtState, NodeResolverTracker, ResolverState},
 };
+use dbt_vfs::PathExt as _;
 
 use std::sync::{Arc, OnceLock};
 
@@ -60,7 +61,7 @@ pub fn try_load_prev_compilation(
     // silently selecting nothing (which would happen if the cache doesn't exist).
     if has_dirty {
         let cache_dir = eval.metadata_dir().join("parse");
-        if !cache_dir.exists() {
+        if !cache_dir.vfs_exists() {
             tracing::error!(
                 "`--dirty` requires a parse cache (none found at {}). \
                  Run once with `--partial-parse` to build the cache.",

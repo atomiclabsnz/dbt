@@ -33,6 +33,7 @@ use dbt_jinja_utils::jinja_environment::JinjaEnv;
 use dbt_schemas::schemas::ResolvedCloudConfig;
 use dbt_schemas::schemas::packages::{DbtPackagesLock, UpstreamProject};
 use dbt_telemetry::{DepsAllPackagesInstalled, GenericOpExecuted};
+use dbt_vfs::PathExt as _;
 use std::sync::Arc;
 use std::{collections::BTreeMap, path::Path};
 use steps::{
@@ -210,7 +211,7 @@ pub async fn get_or_install_packages(
 
         install_span.in_scope(|| {
             // check if the packages install path exists
-            if !packages_install_path.exists() {
+            if !packages_install_path.vfs_exists() {
                 // Create the directory
                 stdfs::create_dir_all(packages_install_path).unwrap();
             }
@@ -233,7 +234,7 @@ pub async fn get_or_install_packages(
             if !packages_install_path
                 .join(package.package_name())
                 .join(DBT_PROJECT_YML)
-                .exists()
+                .vfs_exists()
             {
                 missing_packages.push(package.package_name());
             }
@@ -254,7 +255,7 @@ pub async fn get_or_install_packages(
 
             install_span.in_scope(|| {
                 // check if the packages install path exists
-                if !packages_install_path.exists() {
+                if !packages_install_path.vfs_exists() {
                     // Create the directory
                     stdfs::create_dir_all(packages_install_path).unwrap();
                 }
@@ -269,7 +270,10 @@ pub async fn get_or_install_packages(
                 })?;
 
             for package in dbt_packages_lock.packages.iter() {
-                if !packages_install_path.join(package.package_name()).exists() {
+                if !packages_install_path
+                    .join(package.package_name())
+                    .vfs_exists()
+                {
                     missing_packages_after_auto_install.push(package.package_name());
                 }
             }
@@ -300,7 +304,7 @@ pub async fn get_or_install_packages(
 }
 
 fn emit_auto_install_without_lock_info(io: &IoArgs, command: FsCommand) {
-    if io.in_dir.join(DBT_PACKAGES_LOCK_FILE).exists() {
+    if io.in_dir.join(DBT_PACKAGES_LOCK_FILE).vfs_exists() {
         return;
     }
 

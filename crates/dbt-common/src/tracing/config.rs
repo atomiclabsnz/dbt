@@ -201,7 +201,7 @@ pub fn build_jsonl_file_consumer(
         crate::stdfs::create_dir_all(log_dir)?;
     }
 
-    let file = std::fs::OpenOptions::new()
+    let file = dbt_vfs::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(file_path)
@@ -536,7 +536,7 @@ impl FsTraceConfig {
 
             crate::stdfs::create_dir_all(file_dir)?;
 
-            let file = std::fs::File::create(file_path)
+            let file = dbt_vfs::fs::File::create(file_path)
                 .map_err(|e| fs_err!(ErrorCode::IoError, "Failed to create parquet file: {}", e))?;
 
             let (parquet_layer, writer_handle) =

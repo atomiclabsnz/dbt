@@ -5,7 +5,7 @@ use database::Builder as DatabaseBuilder;
 use dbt_adbc::database::LogLevel;
 use dbt_adbc::{Backend, database, snowflake};
 
-use std::fs;
+use dbt_vfs::fs;
 
 const APP_NAME: &str = "dbt";
 

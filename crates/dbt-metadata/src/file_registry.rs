@@ -1,3 +1,4 @@
+use dbt_vfs::PathExt as _;
 use std::collections::HashMap;
 
 use dbt_common::{FsResult, hashing::code_hash, io_args::IoArgs, stdfs};
@@ -96,7 +97,7 @@ impl CompleteStateWithKind {
 
         for key in self.keys() {
             let absolute_path = io.in_dir.join(&key);
-            if absolute_path.exists() {
+            if absolute_path.vfs_exists() {
                 let code = stdfs::read_to_string(&absolute_path)?;
                 cas.insert(code_hash(&code), code);
             }

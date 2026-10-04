@@ -10,6 +10,7 @@ keywords.workspace = true
 edition.workspace = true
 
 [dependencies]
+dbt-vfs = { workspace = true }
 dbt-fusion-workspace-hack = { version = "0.1" }
 dbt-schemas = { workspace = true }
 dbt-yaml = { workspace = true }

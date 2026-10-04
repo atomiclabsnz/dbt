@@ -13,6 +13,7 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
+dbt-vfs = { workspace = true }
 async-trait = { workspace = true }
 dbt-common = { workspace = true }
 dbt-fusion-workspace-hack = { version = "0.1" }

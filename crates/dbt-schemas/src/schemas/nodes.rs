@@ -1681,7 +1681,7 @@ impl InternalDbtNode for DbtSeed {
                 ) {
                     if self_cs.name == "sha256" {
                         let seed_path = root_path.join(&self.__common_attr__.path);
-                        if let Ok(bytes) = std::fs::read(&seed_path) {
+                        if let Ok(bytes) = dbt_vfs::fs::read(&seed_path) {
                             let legacy = DbtChecksum::seed_content_checksum_legacy(&bytes);
                             same_body_result = legacy == other_seed.__common_attr__.checksum;
                         }

@@ -215,7 +215,7 @@ fn dump_jinja_trace(listener: &JinjaTraceListener, compiled_path: &Path, unique_
     let filename = format!("jinja_trace_{sanitized}.txt");
     if let Some(dir) = compiled_path.parent() {
         let path = dir.join(&filename);
-        if std::fs::write(&path, &trace).is_ok() {
+        if dbt_vfs::fs::write(&path, &trace).is_ok() {
             eprintln!("Jinja trace dump written to: {}", path.display());
         }
     }
@@ -1969,9 +1969,9 @@ pub fn materialize_function(
 
     // Write compiled SQL to file
     if let Some(parent) = compiled_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        let _ = dbt_vfs::fs::create_dir_all(parent);
     }
-    let _ = std::fs::write(&compiled_path, sql);
+    let _ = dbt_vfs::fs::write(&compiled_path, sql);
 
     result
 }

@@ -52,6 +52,7 @@ use dbt_schemas::schemas::{
 use dbt_schemas::state::{
     DbtAsset, DbtPackage, DbtRuntimeConfig, GenericTestAsset, ModelStatus, NodeResolverTracker,
 };
+use dbt_vfs::PathExt as _;
 use minijinja::Value as MinijinjaValue;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -110,7 +111,7 @@ pub async fn resolve_snapshots(
 
     // Create the `snapshots` directory
     let snapshots_dir = arg.io.out_dir.join(DBT_SNAPSHOTS_DIR_NAME);
-    if !snapshots_dir.exists() {
+    if !snapshots_dir.vfs_exists() {
         stdfs::create_dir_all(&snapshots_dir)?;
     }
 

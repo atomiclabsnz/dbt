@@ -11,6 +11,7 @@
 use dbt_common::tracing::span_info::SpanStatusRecorder as _;
 use dbt_common::{ErrorCode, FsResult, create_info_span, err, stdfs};
 use dbt_telemetry::{DepsAddPackage, PackageType};
+use dbt_vfs::PathExt as _;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -176,7 +177,7 @@ pub fn add_package_to_yml(
     let packages_path = Path::new(&packages_yml_filepath);
 
     // Create packages.yml if it doesn't exist
-    if !packages_path.exists() {
+    if !packages_path.vfs_exists() {
         let initial_content = PackagesYaml {
             packages: Vec::new(),
         };
@@ -244,7 +245,7 @@ fn add_package_inner(spec: PackageSpec, project_dir: &Path) -> FsResult<()> {
     if spec.source == PackageType::Local {
         let local_path = Path::new(&spec.name);
         if local_path.is_absolute() {
-            if !local_path.exists() {
+            if !local_path.vfs_exists() {
                 return err!(
                     ErrorCode::InvalidConfig,
                     "Local package path does not exist: {}",
@@ -254,7 +255,7 @@ fn add_package_inner(spec: PackageSpec, project_dir: &Path) -> FsResult<()> {
         } else {
             // For relative paths, check if they exist relative to the project directory
             let full_path = project_dir.join(local_path);
-            if !full_path.exists() {
+            if !full_path.vfs_exists() {
                 return err!(
                     ErrorCode::InvalidConfig,
                     "Local package path does not exist: {} (resolved to: {})",

@@ -738,7 +738,7 @@ impl DataStoreTrait for DataStore {
         batches: Vec<RecordBatch>,
     ) -> SchemaStoreResult<usize> {
         let path = self.get_path_to_data(cfqn);
-        std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| {
+        dbt_vfs::fs::create_dir_all(path.parent().unwrap()).map_err(|e| {
             ArrowError::IoError(format!("Failed to create directory: {}", path.display()), e)
         })?;
         persist_data_as_parquet_file(schema, true, batches, &path)
@@ -753,7 +753,7 @@ impl DataStoreTrait for DataStore {
         >,
     ) -> SchemaStoreResult<usize> {
         let path = self.get_path_to_data(cfqn);
-        std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| {
+        dbt_vfs::fs::create_dir_all(path.parent().unwrap()).map_err(|e| {
             ArrowError::IoError(format!("Failed to create directory: {}", path.display()), e)
         })?;
         persist_data_as_parquet_file_async(schema, true, stream, &path).await
@@ -774,8 +774,8 @@ fn make_parquet_writer(
     schema: SchemaRef,
     delete_on_error: bool,
     output_path: &Path,
-) -> SchemaStoreResult<parquet::arrow::ArrowWriter<std::fs::File>> {
-    let parquet_file = std::fs::File::create(output_path).map_err(|e| {
+) -> SchemaStoreResult<parquet::arrow::ArrowWriter<dbt_vfs::fs::File>> {
+    let parquet_file = dbt_vfs::fs::File::create(output_path).map_err(|e| {
         ArrowError::IoError(
             format!("Failed to create file: {}", output_path.display()),
             e,
@@ -785,7 +785,7 @@ fn make_parquet_writer(
         Ok(writer) => Ok(writer),
         Err(e) => {
             if delete_on_error {
-                std::fs::remove_file(output_path).map_err(|e| {
+                dbt_vfs::fs::remove_file(output_path).map_err(|e| {
                     ArrowError::IoError(
                         format!("Failed to remove file: {}", output_path.display()),
                         e,
@@ -879,14 +879,14 @@ pub fn read_cached_schema_from_parquet(
 ) -> SchemaStoreResult<(SchemaEntry, Timestamp)> {
     use parquet::arrow::arrow_reader::{ArrowReaderOptions, ParquetRecordBatchReaderBuilder};
 
-    let file = std::fs::File::open(table_path).map_err(|e| {
+    let file = dbt_vfs::fs::File::open(table_path).map_err(|e| {
         ArrowError::IoError(format!("Failed to open file: {}", table_path.display()), e)
     })?;
     let options = ArrowReaderOptions::new().with_skip_arrow_metadata(false);
     let reader_builder = ParquetRecordBatchReaderBuilder::try_new_with_options(file, options)?;
     let arrow_schema = reader_builder.schema().clone();
 
-    let timestamp = std::fs::metadata(table_path)
+    let timestamp = dbt_vfs::fs::metadata(table_path)
         .and_then(|m| m.modified())
         .unwrap_or_else(|_| SystemTime::now())
         .duration_since(SystemTime::UNIX_EPOCH)

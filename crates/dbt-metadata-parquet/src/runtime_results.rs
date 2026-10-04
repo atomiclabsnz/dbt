@@ -117,7 +117,7 @@ fn consolidate(dir: &Path, files: &[(u32, PathBuf)]) -> FsResult<()> {
     stdfs::rename(&tmp_path, &consolidated_path)?;
     for (n, path) in files {
         if *n != 0 {
-            let _ = std::fs::remove_file(path);
+            let _ = dbt_vfs::fs::remove_file(path);
         }
     }
     Ok(())

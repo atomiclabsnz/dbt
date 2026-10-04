@@ -8,10 +8,10 @@ use arrow::compute::CastOptions;
 use arrow_schema::{ArrowError, DataType, Field, Schema};
 use datafusion_common::DataFusionError;
 use dbt_adapter_core::AdapterType;
+use dbt_vfs::fs::File;
 use futures::TryStreamExt;
 use parquet::arrow::ArrowWriter;
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
-use std::fs::File;
 use std::io::{BufReader, Seek, SeekFrom};
 use std::{path::Path, sync::Arc};
 
@@ -62,7 +62,7 @@ pub fn read_json_seed(
 /// into memory with std::fs and streamed from a cursor (tokio implements
 /// AsyncRead/AsyncSeek for `std::io::Cursor`).
 #[cfg(not(target_arch = "wasm32"))]
-type SeedFile = tokio::fs::File;
+type SeedFile = dbt_vfs::tokio_fs::File;
 #[cfg(target_arch = "wasm32")]
 type SeedFile = std::io::Cursor<Vec<u8>>;
 
@@ -71,11 +71,11 @@ async fn open_parquet_stream(
     path: &Path,
 ) -> Result<ParquetRecordBatchStreamBuilder<SeedFile>, DataFusionError> {
     #[cfg(not(target_arch = "wasm32"))]
-    let file = tokio::fs::File::open(path)
+    let file = dbt_vfs::tokio_fs::File::open(path)
         .await
         .map_err(|e| DataFusionError::External(Box::new(e)))?;
     #[cfg(target_arch = "wasm32")]
-    let file = std::fs::read(path)
+    let file = dbt_vfs::fs::read(path)
         .map(std::io::Cursor::new)
         .map_err(|e| DataFusionError::External(Box::new(e)))?;
     ParquetRecordBatchStreamBuilder::new(file)

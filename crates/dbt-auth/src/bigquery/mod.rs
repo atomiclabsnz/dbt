@@ -2,6 +2,7 @@ use crate::{AdapterConfig, Auth, AuthError, AuthOutcome, auth_configure_pipeline
 use database::Builder as DatabaseBuilder;
 use dbt_adbc::bigquery::auth_type;
 use dbt_adbc::{Backend, bigquery, database};
+use dbt_vfs::PathExt as _;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use url::Url;
@@ -58,7 +59,7 @@ impl<'a> BigqueryAuthIR<'a> {
             }
             Self::ServiceAccount { keyfile } => {
                 let expanded_path = shellexpand::tilde(keyfile).to_string();
-                if Path::new(&expanded_path).exists() {
+                if Path::new(&expanded_path).vfs_exists() {
                     builder
                         .with_named_option(bigquery::AUTH_TYPE, auth_type::JSON_CREDENTIAL_FILE)?;
                     builder

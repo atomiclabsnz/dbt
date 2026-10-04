@@ -2,6 +2,7 @@ use datafusion_common::error::DataFusionError;
 use datafusion_expr::Expr;
 use dbt_base::cancel::CancelledError;
 use dbt_frontend_common::error::{FrontendError, FrontendResult, NameCandidate, format_candidates};
+use dbt_vfs::PathExt as _;
 use itertools::Itertools as _;
 use regex::Regex;
 use std::{
@@ -632,7 +633,7 @@ impl FsError {
             };
 
             if let Some(token) = token
-                && in_dir.join(file.as_path()).exists()
+                && in_dir.join(file.as_path()).vfs_exists()
             {
                 // patch up trying to find the line/column of the token
                 match crate::utils::find_locations(&token, Path::new(&in_dir.join(file.as_path())))

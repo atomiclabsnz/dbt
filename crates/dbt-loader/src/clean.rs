@@ -3,6 +3,7 @@ use crate::{
     dbt_project_yml_loader::{collect_protected_paths, load_project_yml},
     load_for_clean,
 };
+use dbt_vfs::PathExt as _;
 use std::{
     collections::{BTreeMap, HashSet},
     path::Path,
@@ -123,7 +124,7 @@ pub async fn clean_project(
         let mut lease_guards = vec![];
 
         for path in &paths_to_delete {
-            if path.exists() {
+            if path.vfs_exists() {
                 if path.eq(&default_target_dir) {
                     // We have already acquired the lease for this directory at this point.
                     lease_guards.push((

@@ -1,3 +1,4 @@
+use dbt_vfs::PathExt as _;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -1902,7 +1903,7 @@ fn ingest_metadata_into_index(
     index_dir: &std::path::Path,
     context: &str,
 ) {
-    if !metadata_dir.exists() {
+    if !metadata_dir.vfs_exists() {
         return;
     }
     let mut state = IngestState::default();
@@ -2045,7 +2046,7 @@ async fn run_docs_serve(
         .unwrap_or_else(|| std::path::PathBuf::from("./target"));
     let metadata_dir = target.join("metadata");
 
-    if !index_dir.exists() && !metadata_dir.exists() {
+    if !index_dir.vfs_exists() && !metadata_dir.vfs_exists() {
         emit_error_log_message(
             ErrorCode::Generic,
             format!(
@@ -2097,7 +2098,7 @@ async fn run_docs_serve(
     }
 
     let args = dbt_docs_server::DocsServeArgs {
-        site_dir: site_dir.exists().then_some(site_dir),
+        site_dir: site_dir.vfs_exists().then_some(site_dir),
         ..args
     };
 
@@ -2115,11 +2116,12 @@ async fn run_docs_serve(
 /// `AppState::compute_generation` reports to the UI. Any unreadable timestamp
 /// means regenerate: cheap, and being wrong the other way serves stale docs.
 fn site_needs_regenerating(site_dir: &std::path::Path, index_dir: &std::path::Path) -> bool {
-    let Ok(site_mtime) = std::fs::metadata(site_dir.join("index.html")).and_then(|m| m.modified())
+    let Ok(site_mtime) =
+        dbt_vfs::fs::metadata(site_dir.join("index.html")).and_then(|m| m.modified())
     else {
         return true;
     };
-    let Ok(index_mtime) = std::fs::metadata(index_dir).and_then(|m| m.modified()) else {
+    let Ok(index_mtime) = dbt_vfs::fs::metadata(index_dir).and_then(|m| m.modified()) else {
         return true;
     };
     site_mtime < index_mtime

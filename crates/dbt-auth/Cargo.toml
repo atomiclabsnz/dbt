@@ -13,6 +13,7 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
+dbt-vfs = { workspace = true }
 dbt-adbc = { workspace = true }
 dbt-yaml = { workspace = true }
 

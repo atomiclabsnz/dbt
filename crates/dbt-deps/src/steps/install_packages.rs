@@ -1,3 +1,4 @@
+use dbt_vfs::PathExt as _;
 use std::path::Path;
 
 use dbt_common::tracing::dbt_emit::emit_info_log_message;
@@ -65,7 +66,7 @@ pub async fn install_packages(
         dbt_yaml::to_string(dbt_packages_lock).unwrap()
     };
     let packages_lock_path = ctx.io.in_dir.join(DBT_PACKAGES_LOCK_FILE);
-    std::fs::write(&packages_lock_path, &package_lock_str).map_err(|e| {
+    dbt_vfs::fs::write(&packages_lock_path, &package_lock_str).map_err(|e| {
         fs_err!(
             ErrorCode::IoError,
             "Failed to write package-lock.yml file: {}",
@@ -73,8 +74,8 @@ pub async fn install_packages(
         )
     })?;
 
-    if packages_install_path.exists() {
-        std::fs::remove_dir_all(packages_install_path).map_err(|e| {
+    if packages_install_path.vfs_exists() {
+        dbt_vfs::fs::remove_dir_all(packages_install_path).map_err(|e| {
             fs_err!(
                 ErrorCode::IoError,
                 "Failed to remove existing packages install dir: {}",
@@ -82,7 +83,7 @@ pub async fn install_packages(
             )
         })?;
     }
-    std::fs::create_dir_all(packages_install_path).map_err(|e| {
+    dbt_vfs::fs::create_dir_all(packages_install_path).map_err(|e| {
         fs_err!(
             ErrorCode::IoError,
             "Failed to create packages install dir: {}",

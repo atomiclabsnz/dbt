@@ -8,6 +8,7 @@ use dbt_schemas::schemas::packages::{
     DeprecatedDbtPackagesLock, GitPackageLock, HubPackageLock, LocalPackageLock, PackageVersion,
     PrivatePackageLock, TarballPackageLock,
 };
+use dbt_vfs::PathExt as _;
 use std::{
     collections::BTreeMap, collections::HashMap, collections::HashSet, path::Path, str::FromStr,
 };
@@ -27,7 +28,7 @@ pub async fn try_load_valid_dbt_packages_lock(
     let packages_lock_path = io.in_dir.join(DBT_PACKAGES_LOCK_FILE);
     let sha1_hash =
         fusion_sha1_hash_packages(&dbt_packages.packages, use_v2_compatible_package_downloads);
-    if packages_lock_path.exists() {
+    if packages_lock_path.vfs_exists() {
         let yml_str = stdfs::read_to_string(&packages_lock_path)?;
         let rendered_yml: DbtPackagesLock =
             match from_yaml_raw(&yml_str, Some(&packages_lock_path), true, None) {
@@ -81,7 +82,7 @@ async fn try_load_from_deprecated_dbt_packages_lock(
                 "Old format package-lock.yml file found. Please provide package definitions.",
             );
 
-            if !dbt_packages_dir.exists() {
+            if !dbt_packages_dir.vfs_exists() {
                 emit_warn_log_message(
                     ErrorCode::FmtError,
                     "Attempted to infer package name from package-lock.yml, but no packages directory found, skipping...",
@@ -91,7 +92,7 @@ async fn try_load_from_deprecated_dbt_packages_lock(
             }
 
             // List directories in dbt_packages_dir
-            let all_packages = match dbt_packages_dir.read_dir() {
+            let all_packages = match dbt_packages_dir.vfs_read_dir() {
                 Ok(dir_entries) => dir_entries.collect::<Result<Vec<_>, _>>().map_err(|e| {
                     fs_err!(
                         ErrorCode::IoError,
@@ -320,7 +321,7 @@ pub async fn load_dbt_packages_lock_without_validation(
     vars: &BTreeMap<String, dbt_yaml::Value>,
 ) -> FsResult<Option<DbtPackagesLock>> {
     let packages_lock_path = io.in_dir.join(DBT_PACKAGES_LOCK_FILE);
-    if !packages_lock_path.exists() {
+    if !packages_lock_path.vfs_exists() {
         return Ok(None);
     }
 

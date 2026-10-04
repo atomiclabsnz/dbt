@@ -1092,7 +1092,7 @@ impl DbtChecksum {
         const BYTES_PER_MIB: u64 = 1024 * 1024;
         let maximum_seed_size = maximum_seed_size_mib.saturating_mul(BYTES_PER_MIB);
 
-        let size = std::fs::metadata(file_path)
+        let size = dbt_vfs::fs::metadata(file_path)
             .map_err(|e| {
                 fs_err!(
                     ErrorCode::IoError,
@@ -1108,7 +1108,7 @@ impl DbtChecksum {
                 checksum: original_file_path.to_string(),
             }))
         } else {
-            let file = std::fs::File::open(file_path).map_err(|e| {
+            let file = dbt_vfs::fs::File::open(file_path).map_err(|e| {
                 fs_err!(
                     ErrorCode::IoError,
                     "Failed to open seed file '{}' for content hashing: {}",

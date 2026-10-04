@@ -26,7 +26,7 @@ use serde_arrow::to_record_batch;
 
 /// Scan `dir` for files matching `{prefix}{N}.parquet`, return sorted by N ascending.
 pub fn existing_epochs(dir: &Path, prefix: &str) -> Vec<(u32, PathBuf)> {
-    let Ok(rd) = std::fs::read_dir(dir) else {
+    let Ok(rd) = dbt_vfs::fs::read_dir(dir) else {
         return Vec::new();
     };
     let mut epochs: Vec<(u32, PathBuf)> = rd
@@ -87,7 +87,7 @@ pub fn write_rows<T: Serialize>(path: &Path, fields: &[Field], rows: &[T]) -> Fs
 /// Returns empty Vec if the file doesn't exist or can't be read.
 pub fn read_rows<T: DeserializeOwned>(path: &Path) -> Vec<T> {
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-    let Ok(file) = std::fs::File::open(path) else {
+    let Ok(file) = dbt_vfs::fs::File::open(path) else {
         return Vec::new();
     };
     let Ok(builder) = ParquetRecordBatchReaderBuilder::try_new(file) else {
@@ -108,7 +108,7 @@ pub fn read_rows<T: DeserializeOwned>(path: &Path) -> Vec<T> {
 /// Delete all epoch files in a directory for the given prefix.
 pub fn remove_epochs(dir: &Path, prefix: &str) {
     for (_, path) in existing_epochs(dir, prefix) {
-        let _ = std::fs::remove_file(path);
+        let _ = dbt_vfs::fs::remove_file(path);
     }
 }
 

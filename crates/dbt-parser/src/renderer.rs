@@ -36,6 +36,7 @@ use dbt_schemas::schemas::telemetry::NodeType;
 use dbt_schemas::schemas::{InternalDbtNodeAttributes, IntrospectionKind, Nodes};
 use dbt_schemas::state::{DbtAsset, DbtRuntimeConfig, ModelStatus};
 use dbt_telemetry::AssetParsed;
+use dbt_vfs::PathExt as _;
 use std::fmt::Debug;
 use std::rc::Rc;
 use tracing::Instrument as _;
@@ -936,7 +937,7 @@ async fn process_model_chunk_for_unsafe_detection<T: InternalDbtNodeAttributes +
             .io
             .out_dir
             .join(&model.common().original_file_path)
-            .exists()
+            .vfs_exists()
         {
             PathBuf::from(DBT_TARGET_DIR_NAME).join(&model.common().original_file_path)
         } else {

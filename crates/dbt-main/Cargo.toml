@@ -22,6 +22,7 @@ windows = { version = "0.61", features = [
 ] }
 
 [dependencies]
+dbt-vfs = { workspace = true }
 dbt-adapter = { workspace = true }
 dbt-adapter-core = { workspace = true }
 dbt-clap-core = { workspace = true }

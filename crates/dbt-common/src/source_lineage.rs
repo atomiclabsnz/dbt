@@ -75,7 +75,7 @@ fn project_dir() -> PathBuf {
 }
 
 fn load_overrides_from(path: &Path) -> OverrideMap {
-    let Ok(text) = std::fs::read_to_string(path) else {
+    let Ok(text) = dbt_vfs::fs::read_to_string(path) else {
         return HashMap::default();
     };
     let Ok(raw) = serde_json::from_str::<Vec<(String, String, String)>>(&text) else {
@@ -98,7 +98,7 @@ fn save_overrides_to(path: &Path, map: &OverrideMap) {
         })
         .collect();
     if let Ok(text) = serde_json::to_string_pretty(&raw) {
-        let _ = std::fs::write(path, text);
+        let _ = dbt_vfs::fs::write(path, text);
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::{ErrorCode, FsResult, ectx, fs_err};
 
 use crate::error::LiftableResult;
-use std::fs::Metadata;
+use dbt_vfs::fs::Metadata;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -13,7 +13,7 @@ pub fn canonicalize<P: AsRef<Path>>(path: P) -> FsResult<PathBuf> {
         {
             // Only place in our codebase where std::fs::canonicalize is allowed:
             #[allow(clippy::disallowed_methods)]
-            std::fs::canonicalize(path)
+            dbt_vfs::fs::canonicalize(path)
         }
         #[cfg(target_os = "windows")]
         {
@@ -26,25 +26,25 @@ pub fn canonicalize<P: AsRef<Path>>(path: P) -> FsResult<PathBuf> {
 /// Wrapper around [`std::fs::create_dir_all`] that returns a useful error in case of failure.
 pub fn create_dir_all<P: AsRef<Path>>(path: P) -> FsResult<()> {
     let path = path.as_ref();
-    std::fs::create_dir_all(path).lift(ectx!("Failed to create directory: {}", path.display()))
+    dbt_vfs::fs::create_dir_all(path).lift(ectx!("Failed to create directory: {}", path.display()))
 }
 
 /// Wrapper around [`std::fs::remove_dir_all`] that returns a useful error in case of failure.
 pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> FsResult<()> {
     let path = path.as_ref();
-    std::fs::remove_dir_all(path).lift(ectx!("Failed to delete directory: {}", path.display()))
+    dbt_vfs::fs::remove_dir_all(path).lift(ectx!("Failed to delete directory: {}", path.display()))
 }
 
 /// Wrapper around [`std::fs::read_to_string`] that returns a useful error in case of failure.
 pub fn read_to_string<P: AsRef<Path>>(path: P) -> FsResult<String> {
     let path = path.as_ref();
-    std::fs::read_to_string(path).lift(ectx!("Failed to read file: {}", path.display()))
+    dbt_vfs::fs::read_to_string(path).lift(ectx!("Failed to read file: {}", path.display()))
 }
 
 /// Wrapper around [`std::fs::exists`] that returns a useful error in case of failure.
 pub fn exists<P: AsRef<Path>>(path: P) -> FsResult<bool> {
     let path = path.as_ref();
-    std::fs::exists(path).lift(ectx!(
+    dbt_vfs::fs::exists(path).lift(ectx!(
         "Failed to check if file/dir exists: {}",
         path.display()
     ))
@@ -53,26 +53,26 @@ pub fn exists<P: AsRef<Path>>(path: P) -> FsResult<bool> {
 /// Wrapper around [`std::fs::write`] that returns a useful error in case of failure.
 pub fn write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> FsResult<()> {
     let path = path.as_ref();
-    std::fs::write(path, contents).lift(ectx!("Failed to write file: {}", path.display()))
+    dbt_vfs::fs::write(path, contents).lift(ectx!("Failed to write file: {}", path.display()))
 }
 
 /// Wrapper around [`std::fs::metadata`] that returns a useful error in case of failure.
 pub fn metadata<P: AsRef<Path>>(path: P) -> FsResult<Metadata> {
     let path = path.as_ref();
-    std::fs::metadata(path).lift(ectx!("Failed to get metadata for: {}", path.display()))
+    dbt_vfs::fs::metadata(path).lift(ectx!("Failed to get metadata for: {}", path.display()))
 }
 
 /// Wrapper around [`std::fs::remove_file`] that returns a useful error in case of failure.
 pub fn remove_file<P: AsRef<Path>>(path: P) -> FsResult<()> {
     let path = path.as_ref();
-    std::fs::remove_file(path).lift(ectx!("Failed to remove file: {}", path.display()))
+    dbt_vfs::fs::remove_file(path).lift(ectx!("Failed to remove file: {}", path.display()))
 }
 
 /// Wrapper around [`std::fs::copy`] that returns a useful error in case of failure.
 pub fn copy<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> FsResult<u64> {
     let from = from.as_ref();
     let to = to.as_ref();
-    std::fs::copy(from, to).lift(ectx!(
+    dbt_vfs::fs::copy(from, to).lift(ectx!(
         "Failed to copy file {} to {}",
         from.display(),
         to.display()
@@ -83,7 +83,7 @@ pub fn copy<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> FsResult<u64> {
 pub fn move_file<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> FsResult<()> {
     let from = from.as_ref();
     let to = to.as_ref();
-    std::fs::rename(from, to).lift(ectx!(
+    dbt_vfs::fs::rename(from, to).lift(ectx!(
         "Failed to move file {} to {}",
         from.display(),
         to.display()
@@ -93,7 +93,7 @@ pub fn move_file<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> FsResult<()>
 /// Wrapper around [`std::fs::metadata`] + [`Metadata::modified`] that returns a useful error in case of failure.
 pub fn last_modified<P: AsRef<Path>>(path: P) -> FsResult<SystemTime> {
     let path = path.as_ref();
-    std::fs::metadata(path)
+    dbt_vfs::fs::metadata(path)
         .and_then(|metadata| metadata.modified())
         .lift(ectx!(
             "Failed to get last modified time of: {}",
@@ -104,20 +104,20 @@ pub fn last_modified<P: AsRef<Path>>(path: P) -> FsResult<SystemTime> {
 /// Wrapper around [`std::fs::read`] that returns a useful error in case of failure.
 pub fn read<P: AsRef<Path>>(path: P) -> FsResult<Vec<u8>> {
     let path = path.as_ref();
-    std::fs::read(path).lift(ectx!("Failed to read file: {}", path.display()))
+    dbt_vfs::fs::read(path).lift(ectx!("Failed to read file: {}", path.display()))
 }
 
 /// Wrapper around [`std::fs::read_dir`] that returns a useful error in case of failure.
-pub fn read_dir<P: AsRef<Path>>(path: P) -> FsResult<std::fs::ReadDir> {
+pub fn read_dir<P: AsRef<Path>>(path: P) -> FsResult<dbt_vfs::fs::ReadDir> {
     let path = path.as_ref();
-    std::fs::read_dir(path).lift(ectx!("Failed to read directory: {}", path.display()))
+    dbt_vfs::fs::read_dir(path).lift(ectx!("Failed to read directory: {}", path.display()))
 }
 
 /// Wrapper around [`std::fs::rename`] that returns a useful error in case of failure.
 pub fn rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> FsResult<()> {
     let from = from.as_ref();
     let to = to.as_ref();
-    std::fs::rename(from, to).lift(ectx!(
+    dbt_vfs::fs::rename(from, to).lift(ectx!(
         "Failed to move file {} to {}",
         from.display(),
         to.display()
@@ -184,15 +184,15 @@ pub fn symlink<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> FsResult<()> {
 pub struct File {}
 impl File {
     /// Wrapper around [`std::fs::File::open`] that returns a useful error in case of failure.
-    pub fn open<P: AsRef<Path>>(path: P) -> FsResult<std::fs::File> {
+    pub fn open<P: AsRef<Path>>(path: P) -> FsResult<dbt_vfs::fs::File> {
         let path = path.as_ref();
-        std::fs::File::open(path).lift(ectx!("Failed to open file: {}", path.display()))
+        dbt_vfs::fs::File::open(path).lift(ectx!("Failed to open file: {}", path.display()))
     }
 
     /// Wrapper around [`std::fs::File::create`] that returns a useful error in case of failure.
-    pub fn create<P: AsRef<Path>>(path: P) -> FsResult<std::fs::File> {
+    pub fn create<P: AsRef<Path>>(path: P) -> FsResult<dbt_vfs::fs::File> {
         let path = path.as_ref();
-        std::fs::File::create(path).lift(ectx!("Failed to create file: {}", path.display()))
+        dbt_vfs::fs::File::create(path).lift(ectx!("Failed to create file: {}", path.display()))
     }
 }
 

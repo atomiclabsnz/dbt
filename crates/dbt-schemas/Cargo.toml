@@ -13,6 +13,7 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
+dbt-vfs = { workspace = true }
 blake3 = { workspace = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }

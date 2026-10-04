@@ -227,7 +227,7 @@ impl IncrementalState {
                         continue;
                     }
                     let path = root.join(path_str);
-                    let Ok(meta) = std::fs::metadata(&path) else {
+                    let Ok(meta) = dbt_vfs::fs::metadata(&path) else {
                         return Some("file deleted");
                     };
                     let current_nanos = system_time_to_nanos(meta.modified().unwrap_or(UNIX_EPOCH));
@@ -269,7 +269,7 @@ impl IncrementalState {
                         continue;
                     }
                     let path = root.join(path_str);
-                    let Ok(meta) = std::fs::metadata(&path) else {
+                    let Ok(meta) = dbt_vfs::fs::metadata(&path) else {
                         return false;
                     };
                     let current_nanos = system_time_to_nanos(meta.modified().unwrap_or(UNIX_EPOCH));
@@ -335,7 +335,7 @@ pub fn read_git_info(project_root: &Path) -> Option<GitInfo> {
         .map(|id| id.to_string())
         .unwrap_or_default();
     // Read HEAD file directly to get branch name for symbolic refs.
-    let branch = std::fs::read_to_string(repo.path().join("HEAD"))
+    let branch = dbt_vfs::fs::read_to_string(repo.path().join("HEAD"))
         .ok()
         .and_then(|s| {
             s.trim()
@@ -366,7 +366,7 @@ pub fn hash_cli_vars(vars: &Option<BTreeMap<String, dbt_yaml::Value>>) -> String
 }
 
 pub fn hash_file_at_path(path: &Path) -> String {
-    match std::fs::read(path) {
+    match dbt_vfs::fs::read(path) {
         Ok(bytes) => blake3_hex(&bytes),
         Err(_) => blake3_hex(b"__missing__"),
     }
@@ -988,7 +988,7 @@ pub fn dbt_packages_have_no_file_changes(packages: &[DbtPackage]) -> bool {
                     continue;
                 }
                 let abs = pkg.package_root_path.join(dbt_path.as_path());
-                let Ok(meta) = std::fs::metadata(&abs) else {
+                let Ok(meta) = dbt_vfs::fs::metadata(&abs) else {
                     return false;
                 };
                 let current = meta.modified().unwrap_or(UNIX_EPOCH);

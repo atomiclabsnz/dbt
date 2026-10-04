@@ -1,3 +1,4 @@
+use dbt_vfs::PathExt as _;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -161,7 +162,7 @@ pub fn resolve_with_env_ext(
     target_override: Option<&str>,
     x_alt_target_override: Option<&str>,
 ) -> Result<ResolvedProfile> {
-    let raw_yaml = std::fs::read_to_string(profile_path)?;
+    let raw_yaml = dbt_vfs::fs::read_to_string(profile_path)?;
     let sanitized = sanitize_yml(&raw_yaml);
     let mut doc: dbt_yaml::Value =
         dbt_yaml::from_str(sanitized).map_err(|e| ProfileError::Yaml {
@@ -288,7 +289,7 @@ pub fn find_profiles_path(profiles_dir: Option<&Path>) -> Result<PathBuf> {
 
     if let Some(dir) = profiles_dir {
         let p = dir.join(PROFILES_YML);
-        if p.exists() {
+        if p.vfs_exists() {
             return Ok(p);
         }
         searched.push(p);
@@ -301,7 +302,7 @@ pub fn find_profiles_path(profiles_dir: Option<&Path>) -> Result<PathBuf> {
 
     if let Ok(cwd) = std::env::current_dir() {
         let p = cwd.join(PROFILES_YML);
-        if p.exists() {
+        if p.vfs_exists() {
             return Ok(p);
         }
         searched.push(p);
@@ -309,7 +310,7 @@ pub fn find_profiles_path(profiles_dir: Option<&Path>) -> Result<PathBuf> {
 
     if let Some(home) = dirs::home_dir() {
         let p = home.join(".dbt").join(PROFILES_YML);
-        if p.exists() {
+        if p.vfs_exists() {
             return Ok(p);
         }
         searched.push(p);
@@ -387,7 +388,7 @@ fn resolve_profile_name(args: &ResolveArgs) -> Result<String> {
 
 fn read_profile_from_project(project_dir: &Path) -> Option<String> {
     let path = project_dir.join("dbt_project.yml");
-    let raw = std::fs::read_to_string(path).ok()?;
+    let raw = dbt_vfs::fs::read_to_string(path).ok()?;
     let doc: dbt_yaml::Value = dbt_yaml::from_str(&raw).ok()?;
     doc.get("profile")?.as_str().map(String::from)
 }

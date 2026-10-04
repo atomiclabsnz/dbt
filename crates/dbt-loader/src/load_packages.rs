@@ -3,9 +3,10 @@ use dbt_common::cancellation::CancellationToken;
 use dbt_common::path::DbtPath;
 use dbt_common::tracing::dbt_emit::emit_warn_log_message;
 use dbt_jinja_utils::jinja_environment::JinjaEnv;
+use dbt_vfs::PathExt as _;
+use dbt_vfs::walkdir::WalkDir;
 use indexmap::IndexMap;
 use sha2::{Digest, Sha256};
-use walkdir::WalkDir;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::Read;
@@ -48,7 +49,7 @@ pub async fn load_packages(
     // Collect dependency package paths with a flag set to `true`
     // indicating that they are indeed dependencies. This is necessary
     // to differentiate between root project and dependencies later on.
-    let mut dirs = if packages_install_path.exists() {
+    let mut dirs = if packages_install_path.vfs_exists() {
         stdfs::read_dir(packages_install_path)?
             .filter_map(|e| e.ok())
             .filter(|e| {
@@ -141,10 +142,10 @@ pub fn persist_internal_packages(
             let embedded_data = asset_contents.data.as_ref();
 
             // Check if file needs to be written
-            let needs_write = if install_path.exists() {
+            let needs_write = if install_path.vfs_exists() {
                 // Compare hashes
                 let mut existing_data = Vec::new();
-                std::fs::File::open(&install_path)
+                dbt_vfs::fs::File::open(&install_path)
                     .and_then(|mut f| f.read_to_end(&mut existing_data))
                     .map(|_| {
                         let embedded_hash = Sha256::digest(embedded_data);
@@ -158,7 +159,7 @@ pub fn persist_internal_packages(
 
             if needs_write {
                 if let Some(parent) = install_path.parent() {
-                    std::fs::create_dir_all(parent).map_err(|e| {
+                    dbt_vfs::fs::create_dir_all(parent).map_err(|e| {
                         fs_err!(
                             ErrorCode::IoError,
                             "Failed to create directory for dbt adapter package {}: {}",
@@ -167,7 +168,7 @@ pub fn persist_internal_packages(
                         )
                     })?;
                 }
-                std::fs::write(&install_path, embedded_data).map_err(|e| {
+                dbt_vfs::fs::write(&install_path, embedded_data).map_err(|e| {
                     fs_err!(
                         ErrorCode::IoError,
                         "Failed to write file for dbt adapter package {}: {}",
@@ -189,7 +190,7 @@ pub fn persist_internal_packages(
     }
 
     // Remove extra files not in expected set
-    if internal_packages_install_path.exists() {
+    if internal_packages_install_path.vfs_exists() {
         for entry in WalkDir::new(internal_packages_install_path)
             .into_iter()
             .filter_map(|e| e.ok())
@@ -197,7 +198,7 @@ pub fn persist_internal_packages(
             if entry.file_type().is_file() {
                 let path = entry.path().to_path_buf();
                 if !expected_files.contains(&path) {
-                    std::fs::remove_file(&path).map_err(|e| {
+                    dbt_vfs::fs::remove_file(&path).map_err(|e| {
                         fs_err!(
                             ErrorCode::IoError,
                             "Failed to remove stale adapter package file {}: {}",
@@ -228,8 +229,8 @@ async fn collect_packages(
     // `is_dependency` Indicates if we are loading a dependency or a root project
     for (package_path, is_dependency) in package_paths {
         token.check_cancellation()?;
-        if package_path.is_dir() {
-            if package_path.join(DBT_PROJECT_YML).exists() {
+        if package_path.vfs_is_dir() {
+            if package_path.join(DBT_PROJECT_YML).vfs_exists() {
                 let package = load_inner(
                     arg,
                     env,

@@ -2,9 +2,9 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::{Deserialize, Serialize};
 #[cfg(not(target_arch = "wasm32"))]
-use tokio::fs;
+use dbt_vfs::tokio_fs as fs;
+use serde::{Deserialize, Serialize};
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::io::AsyncWriteExt;
 
@@ -15,13 +15,13 @@ mod fs {
     use std::path::Path;
 
     pub async fn read_to_string(p: impl AsRef<Path>) -> io::Result<String> {
-        std::fs::read_to_string(p)
+        dbt_vfs::fs::read_to_string(p)
     }
     pub async fn remove_file(p: impl AsRef<Path>) -> io::Result<()> {
-        std::fs::remove_file(p)
+        dbt_vfs::fs::remove_file(p)
     }
     pub async fn create_dir_all(p: impl AsRef<Path>) -> io::Result<()> {
-        std::fs::create_dir_all(p)
+        dbt_vfs::fs::create_dir_all(p)
     }
 }
 
@@ -182,7 +182,7 @@ async fn write_token_file(path: &Path, contents: &[u8]) -> std::io::Result<()> {
 
 #[cfg(target_arch = "wasm32")]
 async fn write_token_file(path: &Path, contents: &[u8]) -> std::io::Result<()> {
-    std::fs::write(path, contents)
+    dbt_vfs::fs::write(path, contents)
 }
 
 #[cfg(unix)]

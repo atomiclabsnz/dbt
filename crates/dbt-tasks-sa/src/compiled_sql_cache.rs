@@ -69,11 +69,11 @@ impl CompiledSqlCache for CompiledSqlCacheImpl {
         let absolute_compiled_path = self.get_compiled_sql_path(io, common);
         let absolute_macro_span_path = absolute_compiled_path.with_extension("macro_spans.json");
 
-        let Ok(rendered_sql_maybe_with_cte) = std::fs::read_to_string(absolute_compiled_path)
+        let Ok(rendered_sql_maybe_with_cte) = dbt_vfs::fs::read_to_string(absolute_compiled_path)
         else {
             return None;
         };
-        let Ok(macro_spans_json) = std::fs::read_to_string(absolute_macro_span_path) else {
+        let Ok(macro_spans_json) = dbt_vfs::fs::read_to_string(absolute_macro_span_path) else {
             return None;
         };
         let Ok(CachedSpans {

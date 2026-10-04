@@ -9,6 +9,7 @@
 //!   `all_deps_present()`.
 //! * Always includes all macros — needed for Jinja rendering.
 
+use dbt_vfs::PathExt as _;
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -118,7 +119,7 @@ pub fn resolve_unique_ids_from_index(
         return None;
     }
     let dir = cache_dir(out_dir);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return None;
     }
 
@@ -182,7 +183,7 @@ pub fn resolve_unique_ids_from_index(
 /// Returns `None` when the cache directory does not exist.
 pub fn dirty_seed_ids_from_index(out_dir: &Path) -> Option<HashSet<String>> {
     let dir = cache_dir(out_dir);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return None;
     }
     let rs_rows: Vec<ResolverStateRow> =
@@ -216,7 +217,7 @@ pub fn resolve_dirty_unique_ids_from_index(
     include_indirect: bool,
 ) -> Option<HashSet<String>> {
     let dir = cache_dir(out_dir);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return None;
     }
 

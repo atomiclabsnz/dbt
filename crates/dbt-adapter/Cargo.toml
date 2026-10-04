@@ -13,6 +13,7 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
+dbt-vfs = { workspace = true }
 adbc-record-replay = { workspace = true }
 dbt-adapter-core = { workspace = true }
 dbt-adapter-sql = { workspace = true }

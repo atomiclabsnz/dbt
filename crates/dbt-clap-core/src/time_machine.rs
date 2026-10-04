@@ -1,3 +1,4 @@
+use dbt_vfs::PathExt as _;
 use std::path::{Path, PathBuf};
 
 use dbt_common::io_args::{
@@ -14,14 +15,14 @@ use crate::CommonArgs;
 /// `019384a5-b6c7-7def-8901-234567890abc`). UUID v7 is time-ordered, so sorting
 /// by directory name gives us chronological order.
 pub fn find_latest_recording(base_dir: &Path) -> Option<PathBuf> {
-    let entries = std::fs::read_dir(base_dir).ok()?;
+    let entries = dbt_vfs::fs::read_dir(base_dir).ok()?;
 
     let mut recording_dirs: Vec<_> = entries
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let path = entry.path();
             // Only consider directories that contain a header.json (valid recordings)
-            if path.is_dir() && path.join("header.json").exists() {
+            if path.vfs_is_dir() && path.join("header.json").vfs_exists() {
                 Some(path)
             } else {
                 None

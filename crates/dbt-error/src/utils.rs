@@ -43,7 +43,7 @@ pub fn find_locations(token: &str, file: &Path) -> FsResult<Option<(u32, u32, u3
 }
 
 fn find_token_positions_in_file(file: &Path, token: &str) -> FsResult<Vec<(u32, u32, u32)>> {
-    let file = std::fs::File::open(file).map_err(|e| {
+    let file = dbt_vfs::fs::File::open(file).map_err(|e| {
         FsError::new(
             ErrorCode::IoError,
             format!("Failed to open file {}: {}", file.display(), e),
@@ -89,7 +89,7 @@ pub fn canonicalize<P: AsRef<Path>>(path: P) -> Result<PathBuf, std::io::Error> 
     {
         // Only place in our codebase where std::fs::canonicalize is allowed:
         #[allow(clippy::disallowed_methods)]
-        std::fs::canonicalize(path)
+        dbt_vfs::fs::canonicalize(path)
     }
     #[cfg(target_os = "windows")]
     {

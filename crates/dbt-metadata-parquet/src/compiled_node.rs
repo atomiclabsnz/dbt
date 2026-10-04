@@ -131,7 +131,7 @@ fn compact_epochs(dir: &Path, valid_ids: Option<&HashSet<String>>) -> FsResult<(
 
     for (n, path) in &epochs {
         if *n != 0 {
-            let _ = std::fs::remove_file(path);
+            let _ = dbt_vfs::fs::remove_file(path);
         }
     }
     Ok(())

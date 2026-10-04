@@ -35,7 +35,7 @@ pub fn get_cloud_project_path() -> Result<PathBuf, String> {
 /// Reads and parses `dbt_cloud.yml` at `path`, returning the full config
 /// or `None` if the file does not exist.
 pub fn parse_cloud_config(path: &Path) -> Result<Option<DbtCloudConfig>, String> {
-    let content = match std::fs::read_to_string(path) {
+    let content = match dbt_vfs::fs::read_to_string(path) {
         Ok(content) => content,
         Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
         Err(e) => {

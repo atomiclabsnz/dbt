@@ -1,84 +1,10 @@
 use std::path::Path;
 use std::time::SystemTime;
 
-// ferrion-wasm: tokio refuses its `fs` feature on every wasm target (it is
-// `std::fs` behind `spawn_blocking`, and wasm has no blocking pool). On wasm the
-// same wrappers run `std::fs` inline. That COMPILES on wasm32-unknown-unknown,
-// where every call returns `Unsupported` at runtime; an embedder must supply the
-// project through a virtual filesystem above this layer (or via wasip1 preopens).
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::fs as afs;
-
-#[cfg(target_arch = "wasm32")]
-mod afs {
-    use std::io;
-    use std::path::{Path, PathBuf};
-
-    pub async fn create_dir_all(p: impl AsRef<Path>) -> io::Result<()> {
-        std::fs::create_dir_all(p)
-    }
-    pub async fn remove_dir_all(p: impl AsRef<Path>) -> io::Result<()> {
-        std::fs::remove_dir_all(p)
-    }
-    pub async fn read_to_string(p: impl AsRef<Path>) -> io::Result<String> {
-        std::fs::read_to_string(p)
-    }
-    pub async fn read(p: impl AsRef<Path>) -> io::Result<Vec<u8>> {
-        std::fs::read(p)
-    }
-    pub async fn write(p: impl AsRef<Path>, c: impl AsRef<[u8]>) -> io::Result<()> {
-        std::fs::write(p, c)
-    }
-    pub async fn copy(a: impl AsRef<Path>, b: impl AsRef<Path>) -> io::Result<u64> {
-        std::fs::copy(a, b)
-    }
-    pub async fn metadata(p: impl AsRef<Path>) -> io::Result<std::fs::Metadata> {
-        std::fs::metadata(p)
-    }
-    pub async fn try_exists(p: impl AsRef<Path>) -> io::Result<bool> {
-        std::fs::exists(p)
-    }
-    pub async fn remove_file(p: impl AsRef<Path>) -> io::Result<()> {
-        std::fs::remove_file(p)
-    }
-    pub async fn read_link(p: impl AsRef<Path>) -> io::Result<PathBuf> {
-        std::fs::read_link(p)
-    }
-    pub async fn rename(a: impl AsRef<Path>, b: impl AsRef<Path>) -> io::Result<()> {
-        std::fs::rename(a, b)
-    }
-
-    /// The subset of `tokio::fs::ReadDir` the workspace uses.
-    pub struct ReadDir(std::fs::ReadDir);
-
-    impl ReadDir {
-        pub async fn next_entry(&mut self) -> io::Result<Option<DirEntry>> {
-            self.0.next().transpose().map(|e| e.map(DirEntry))
-        }
-    }
-
-    /// The subset of `tokio::fs::DirEntry` the workspace uses.
-    pub struct DirEntry(std::fs::DirEntry);
-
-    impl DirEntry {
-        pub fn path(&self) -> PathBuf {
-            self.0.path()
-        }
-        pub fn file_name(&self) -> std::ffi::OsString {
-            self.0.file_name()
-        }
-        pub async fn file_type(&self) -> io::Result<std::fs::FileType> {
-            self.0.file_type()
-        }
-        pub async fn metadata(&self) -> io::Result<std::fs::Metadata> {
-            self.0.metadata()
-        }
-    }
-
-    pub async fn read_dir(p: impl AsRef<Path>) -> io::Result<ReadDir> {
-        std::fs::read_dir(p).map(ReadDir)
-    }
-}
+// ferrion-wasm: every wrapper goes through dbt_vfs::tokio_fs, which is
+// tokio::fs natively and, on wasm32 (where tokio refuses `fs`) or with
+// `dbt-vfs/memory`, the in-memory filesystem with every call inline.
+use dbt_vfs::tokio_fs as afs;
 
 use crate::error::LiftableResult;
 use crate::{FsResult, ectx};
@@ -147,7 +73,7 @@ pub async fn last_modified<P: AsRef<Path>>(path: P) -> FsResult<SystemTime> {
 }
 
 /// Wrapper around [`tokio::fs::metadata`] that returns a useful error in case of failure.
-pub async fn metadata(path: impl AsRef<Path>) -> FsResult<std::fs::Metadata> {
+pub async fn metadata(path: impl AsRef<Path>) -> FsResult<dbt_vfs::fs::Metadata> {
     let path = path.as_ref();
     afs::metadata(path)
         .await
@@ -187,7 +113,7 @@ pub async fn symlink(target: impl AsRef<Path>, link: impl AsRef<Path>) -> FsResu
     let link = link.as_ref();
     #[cfg(unix)]
     {
-        tokio::fs::symlink(target, link).await.lift(ectx!(
+        dbt_vfs::tokio_fs::symlink(target, link).await.lift(ectx!(
             "Failed to create symlink from {} to {}",
             link.display(),
             target.display()
@@ -195,11 +121,13 @@ pub async fn symlink(target: impl AsRef<Path>, link: impl AsRef<Path>) -> FsResu
     }
     #[cfg(windows)]
     {
-        tokio::fs::symlink_dir(target, link).await.lift(ectx!(
-            "Failed to create symlink from {} to {}",
-            link.display(),
-            target.display()
-        ))
+        dbt_vfs::tokio_fs::symlink_dir(target, link)
+            .await
+            .lift(ectx!(
+                "Failed to create symlink from {} to {}",
+                link.display(),
+                target.display()
+            ))
     }
 }
 
@@ -223,12 +151,12 @@ pub async fn read_dir(path: impl AsRef<Path>) -> FsResult<afs::ReadDir> {
 }
 
 pub struct File {}
-#[cfg(not(target_arch = "wasm32"))]
+// ferrion-wasm: on every target (dbt_vfs::tokio_fs has a File everywhere).
 impl File {
     /// Wrapper around [`tokio::fs::File::create`] that returns a useful error in case of failure.
-    pub async fn create<P: AsRef<Path>>(path: P) -> FsResult<tokio::fs::File> {
+    pub async fn create<P: AsRef<Path>>(path: P) -> FsResult<dbt_vfs::tokio_fs::File> {
         let path = path.as_ref();
-        tokio::fs::File::create(path)
+        dbt_vfs::tokio_fs::File::create(path)
             .await
             .lift(ectx!("Failed to create file: {}", path.display()))
     }

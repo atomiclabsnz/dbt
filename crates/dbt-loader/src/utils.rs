@@ -6,6 +6,7 @@ use dbt_common::{
     fs_err, stdfs,
 };
 use dbt_jinja_utils::serde::from_yaml_raw;
+use dbt_vfs::PathExt as _;
 use pathdiff::diff_paths;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -14,12 +15,13 @@ use std::{
 };
 
 use dbt_schemas::schemas::packages::{DbtPackageEntry, DbtPackages};
+use dbt_vfs::fs::metadata;
 use fs_deps::utils::get_local_package_full_path;
 use serde::de::DeserializeOwned;
-use std::{fs::metadata, io, time::SystemTime};
+use std::{io, time::SystemTime};
 
+use dbt_vfs::walkdir::WalkDir;
 use ignore::gitignore::Gitignore;
-use walkdir::WalkDir;
 
 // ------------------------------------------------------------------------------------------------
 // path, directory, and file stuff
@@ -31,12 +33,12 @@ pub fn collect_file_info<P: AsRef<Path>, T: Fn(&Path) -> bool>(
     dbtignore: Option<&Gitignore>,
     filter: T,
 ) -> io::Result<()> {
-    if !base_path.as_ref().exists() {
+    if !base_path.as_ref().vfs_exists() {
         return Ok(());
     }
     for relative_path in relative_paths {
         let full_path = base_path.as_ref().join(relative_path);
-        if !full_path.exists() {
+        if !full_path.vfs_exists() {
             continue;
         }
         // Configure WalkDir to respect gitignore patterns at the directory level
@@ -63,7 +65,7 @@ pub fn collect_file_info<P: AsRef<Path>, T: Fn(&Path) -> bool>(
         }) {
             let entry = entry_result?;
             if entry.file_type().is_file()
-                || (entry.file_type().is_symlink() && entry.path().is_file())
+                || (entry.file_type().is_symlink() && entry.path().vfs_is_file())
             {
                 // Skip macOS AppleDouble resource fork files (._*) — they are never dbt assets
                 // and contain binary metadata that causes UTF-8 read failures on Linux.
@@ -114,7 +116,7 @@ pub fn load_raw_yml<T: DeserializeOwned>(
     path: &Path,
     dependency_package_name: Option<&str>,
 ) -> FsResult<T> {
-    let mut file = std::fs::File::open(path).map_err(|e| {
+    let mut file = dbt_vfs::fs::File::open(path).map_err(|e| {
         fs_err!(
             code => ErrorCode::IoError,
             loc => path.to_path_buf(),
@@ -211,7 +213,7 @@ pub fn identify_package_dependencies(
 
     // Process dependencies.yml if it exists
     let dependencies_yml_path = in_dir.join(DBT_DEPENDENCIES_YML);
-    if dependencies_yml_path.exists() {
+    if dependencies_yml_path.vfs_exists() {
         dependencies.extend(process_package_file(
             io_args,
             &dependencies_yml_path,
@@ -222,7 +224,7 @@ pub fn identify_package_dependencies(
 
     // Process packages.yml if it exists
     let packages_yml_path = in_dir.join(DBT_PACKAGES_YML);
-    if packages_yml_path.exists() {
+    if packages_yml_path.vfs_exists() {
         dependencies.extend(process_package_file(
             io_args,
             &packages_yml_path,
@@ -243,8 +245,8 @@ mod tests {
     fn collect_file_info_includes_symlinked_files() {
         let temp_dir = tempfile::tempdir().unwrap();
         let models_dir = temp_dir.path().join("models");
-        std::fs::create_dir(&models_dir).unwrap();
-        std::fs::write(models_dir.join("shared.sql"), "select 1").unwrap();
+        dbt_vfs::fs::create_dir(&models_dir).unwrap();
+        dbt_vfs::fs::write(models_dir.join("shared.sql"), "select 1").unwrap();
         symlink("shared.sql", models_dir.join("linked.sql")).unwrap();
 
         let mut paths = Vec::new();

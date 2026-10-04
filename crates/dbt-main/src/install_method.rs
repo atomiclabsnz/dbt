@@ -127,7 +127,7 @@ fn is_pip_installed(binary_path: &Path) -> bool {
 
 /// Iterator over `<lib>/python*` directories, empty if `lib` is unreadable.
 fn python_dirs(lib: &Path) -> impl Iterator<Item = std::path::PathBuf> {
-    std::fs::read_dir(lib)
+    dbt_vfs::fs::read_dir(lib)
         .into_iter()
         .flatten()
         .flatten()
@@ -140,7 +140,7 @@ fn python_dirs(lib: &Path) -> impl Iterator<Item = std::path::PathBuf> {
 }
 
 fn site_packages_has_dbt(site_packages: &Path) -> bool {
-    let Ok(entries) = std::fs::read_dir(site_packages) else {
+    let Ok(entries) = dbt_vfs::fs::read_dir(site_packages) else {
         return false;
     };
     entries.flatten().any(|entry| {

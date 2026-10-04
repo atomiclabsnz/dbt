@@ -4,6 +4,7 @@ use crate::stdfs::File;
 use crate::tracing::dbt_metrics::{error_count_checkpoint, return_exit_code_from_error_counter};
 use crate::{ErrorCode, FsResult, err, fs_err, stdfs::canonicalize};
 use dbt_telemetry::{ExecutionPhase, NodeOutcome};
+use dbt_vfs::PathExt as _;
 use dbt_yaml::Span;
 use pathdiff::diff_paths;
 use std::{
@@ -61,7 +62,7 @@ pub fn determine_project_dir(inputs: &[String], project_file: &str) -> FsResult<
 
     if let Some(input) = inputs.iter().next() {
         let input_path = Path::new(&input);
-        if input_path.is_file()
+        if input_path.vfs_is_file()
             && (is_allowed_extension_for_project(input_path)
                 || input_path.file_name() == Some(OsStr::new(project_file)))
         {
@@ -76,7 +77,7 @@ pub fn determine_project_dir(inputs: &[String], project_file: &str) -> FsResult<
                     );
                 }
             }
-        } else if input_path.is_dir() {
+        } else if input_path.vfs_is_dir() {
             match canonicalize(input_path) {
                 Ok(path_buf) => {
                     search_start = path_buf;
@@ -135,7 +136,7 @@ pub fn find_file(starting_directory: &Path, file: &Path) -> Option<PathBuf> {
     let mut path: PathBuf = starting_directory.into();
     loop {
         path.push(file);
-        if path.is_file() {
+        if path.vfs_is_file() {
             break canonicalize(path).ok();
         }
         if !(path.pop() && path.pop()) {

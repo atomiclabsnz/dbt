@@ -9,6 +9,7 @@ use dbt_schemas::schemas::{
     selectors::{SelectorDefaultSpec, SelectorEntry, SelectorFile},
 };
 use dbt_selector_parser::{ResolvedSelector, SelectorParser};
+use dbt_vfs::PathExt as _;
 use dbt_yaml::Value as YmlValue;
 use std::collections::{BTreeMap, HashMap};
 
@@ -138,7 +139,7 @@ fn load_and_parse_selectors_file(
     jinja_env: &JinjaEnv,
 ) -> FsResult<Option<SelectorFile>> {
     let path = arg.io.in_dir.join("selectors.yml");
-    if !path.exists() {
+    if !path.vfs_exists() {
         return Ok(None);
     }
 

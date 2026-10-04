@@ -5,6 +5,7 @@
 //! act as ordering barriers that must match in sequence, but reads between two barriers
 //! (a "segment") can match in any order, so minor read reordering doesn't break replay.
 
+use dbt_vfs::PathExt as _;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
@@ -474,24 +475,24 @@ impl Recording {
     pub fn load(path: impl AsRef<Path>) -> Result<Self, ReplayError> {
         let path = path.as_ref();
 
-        if !path.exists() {
+        if !path.vfs_exists() {
             return Err(ReplayError::NotFound(path.display().to_string()));
         }
 
         // Load header
         let header_path = path.join("header.json");
-        let header_content = std::fs::read_to_string(&header_path).map_err(|e| {
+        let header_content = dbt_vfs::fs::read_to_string(&header_path).map_err(|e| {
             ReplayError::InvalidFormat(format!("Failed to read header.json: {}", e))
         })?;
         let header: RecordingHeader = serde_json::from_str(&header_content)?;
 
         // Load events
         let events_path = path.join("events.ndjson.gz");
-        let events = if events_path.exists() {
+        let events = if events_path.vfs_exists() {
             load_events_gzipped(&events_path)?
         } else {
             let events_path = path.join("events.ndjson");
-            if events_path.exists() {
+            if events_path.vfs_exists() {
                 load_events_plain(&events_path)?
             } else {
                 return Err(ReplayError::InvalidFormat(
@@ -1160,7 +1161,7 @@ impl Recording {
 
 /// Load events from a gzipped NDJSON file.
 fn load_events_gzipped(path: &Path) -> Result<Vec<RecordedEvent>, ReplayError> {
-    let file = std::fs::File::open(path)?;
+    let file = dbt_vfs::fs::File::open(path)?;
     let decoder = GzDecoder::new(file);
     let reader = BufReader::new(decoder);
     load_events_from_reader(reader)
@@ -1168,7 +1169,7 @@ fn load_events_gzipped(path: &Path) -> Result<Vec<RecordedEvent>, ReplayError> {
 
 /// Load events from a plain NDJSON file.
 fn load_events_plain(path: &Path) -> Result<Vec<RecordedEvent>, ReplayError> {
-    let file = std::fs::File::open(path)?;
+    let file = dbt_vfs::fs::File::open(path)?;
     let reader = BufReader::new(file);
     load_events_from_reader(reader)
 }

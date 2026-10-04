@@ -17,12 +17,12 @@ use dbt_schemas::schemas::macros::MacroConfig;
 use dbt_schemas::schemas::macros::MacroDependsOn;
 use dbt_schemas::schemas::properties::MacrosProperties;
 use dbt_schemas::state::DbtAsset;
+use dbt_vfs::fs;
 use minijinja::Value as MinijinjaValue;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ffi::OsStr;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 

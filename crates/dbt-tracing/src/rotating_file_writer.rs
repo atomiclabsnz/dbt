@@ -1,5 +1,6 @@
+use dbt_vfs::PathExt as _;
+use dbt_vfs::fs::{File, OpenOptions};
 use std::ffi::OsString;
-use std::fs::{File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
@@ -63,8 +64,8 @@ impl RotatingFileWriter {
             let src = Self::log_file_path(&self.base_path, idx);
             let dst = Self::log_file_path(&self.base_path, idx + 1);
 
-            if src.exists() {
-                std::fs::rename(src, dst)?;
+            if src.vfs_exists() {
+                dbt_vfs::fs::rename(src, dst)?;
             }
         }
 

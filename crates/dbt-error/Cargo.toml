@@ -13,6 +13,7 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
+dbt-vfs = { workspace = true }
 # Frontend errors auto-conversion
 dbt-frontend-common = { workspace = true }
 dbt-proc-macros = { workspace = true }

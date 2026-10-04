@@ -1,3 +1,4 @@
+use dbt_vfs::PathExt as _;
 use std::{
     borrow::Cow,
     collections::{BTreeMap, HashMap, HashSet},
@@ -387,7 +388,7 @@ async fn load_cache(
     token: &CancellationToken,
 ) -> FsResult<Option<CacheState>> {
     if let Some((prev_loaded_project, prev_resolved_state)) = prev_resolved_state {
-        if !io.out_dir.exists() {
+        if !io.out_dir.vfs_exists() {
             return Err(fs_err!(
                 ErrorCode::CacheError,
                 "Target directory does not exist",

@@ -21,6 +21,7 @@ testing = []
 workspace = true
 
 [dependencies]
+dbt-vfs = { workspace = true }
 dbt-adapter = { workspace = true }
 dbt-adapter-core = { workspace = true }
 dbt-agate = { workspace = true }

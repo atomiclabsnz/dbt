@@ -6,11 +6,12 @@ use clap::{
 use dbt_adapter_core::{AdapterType, STATIC_ANALYSIS_SUPPORTED_ADAPTERS};
 use dbt_base::{HashMap, HashSet};
 use dbt_telemetry::NodeType;
+use dbt_vfs::PathExt as _;
+use dbt_vfs::fs;
 use dbt_yaml::{JsonSchema, Value};
 use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 use std::ffi::{OsStr, OsString};
-use std::fs;
 use std::str::FromStr;
 use std::{
     collections::BTreeMap,
@@ -398,7 +399,7 @@ impl IoArgs {
         }
         if path.is_relative() {
             let target_path = in_dir.join(DBT_TARGET_DIR_NAME).join(path);
-            if target_path.exists() {
+            if target_path.vfs_exists() {
                 return format!("target/{}", path.to_string_lossy());
             }
         }
@@ -1552,9 +1553,9 @@ pub fn check_target(filename: &str) -> Result<String, String> {
         "Input file '{filename}' must have .sql, or .yml extension"
     ));
     // TODO check that this test is universal for all inputs...
-    if path.is_dir() {
+    if path.vfs_is_dir() {
         Ok(filename.to_owned())
-    } else if path.is_file() {
+    } else if path.vfs_is_file() {
         match path.extension().and_then(|ext| ext.to_str()) {
             Some("yml") | Some("sql") => Ok(filename.to_owned()),
             Some(_) => err,
@@ -1618,7 +1619,7 @@ pub fn check_env_var(vars: &str) -> Result<HashMap<String, String>, String> {
         }
     } else {
         let path = Path::new(config);
-        if path.is_file() {
+        if path.vfs_is_file() {
             if path.extension().unwrap() == "yml" {
                 match fs::read_to_string(path) {
                     Ok(yaml_data) => {

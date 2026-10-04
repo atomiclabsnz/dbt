@@ -39,6 +39,7 @@
 //! All filtering and graph traversal that used SQL is done in Rust over the
 //! deserialized row vectors.
 
+use dbt_vfs::PathExt as _;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
@@ -1289,12 +1290,12 @@ pub fn load_filtered_with_unique_ids(
 ) -> Option<LoadedState> {
     let t0 = Instant::now();
     let dir = cache_dir(out_dir);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return None;
     }
     // generation.parquet is the presence sentinel — if it's missing the cache is invalid.
     let gen_file = generation_path(&dir);
-    if !gen_file.exists() {
+    if !gen_file.vfs_exists() {
         return None;
     }
     t("filecheck (dir+generation exists)", t0);

@@ -14,6 +14,7 @@ use dbt_common::string_utils::test_name_from_uid;
 use dbt_common::tracing::dbt_emit::emit_warn_log_message;
 use dbt_common::{ErrorCode, FsResult, constants::DBT_MANIFEST_JSON, fs_err};
 use dbt_telemetry::NodeType;
+use dbt_vfs::PathExt as _;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -436,7 +437,7 @@ impl StateArtifacts {
                 // a hard error regardless of the caller's policy — a corrupt manifest must
                 // never be silently skipped (issue #1319).
                 // Only apply the caller's on_failure policy when the file is simply absent.
-                if manifest_path.exists() {
+                if manifest_path.vfs_exists() {
                     return Err(fs_err!(
                         ErrorCode::ManifestLoadFailed,
                         "Failed to load manifest.json from state path '{}': {}",

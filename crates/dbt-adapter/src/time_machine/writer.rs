@@ -92,12 +92,12 @@ pub async fn writer_task(
     config: WriterConfig,
     token: CancellationToken,
 ) -> io::Result<RecordingResult> {
-    std::fs::create_dir_all(&config.output_path)?;
+    dbt_vfs::fs::create_dir_all(&config.output_path)?;
 
     let header_path = config.output_path.join("header.json");
     let header_json = serde_json::to_string_pretty(&header)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    std::fs::write(&header_path, header_json)?;
+    dbt_vfs::fs::write(&header_path, header_json)?;
 
     // Create events file (with or without compression)
     let events_path = if config.compress {
@@ -106,7 +106,7 @@ pub async fn writer_task(
         config.output_path.join("events.ndjson")
     };
 
-    let file = std::fs::File::create(&events_path)?;
+    let file = dbt_vfs::fs::File::create(&events_path)?;
     let mut writer: Box<dyn Write + Send> = if config.compress {
         Box::new(flate2::write::GzEncoder::new(
             file,
@@ -170,7 +170,7 @@ pub async fn writer_task(
     let index_path = config.output_path.join("index.json");
     let index_json = serde_json::to_string_pretty(&index)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    std::fs::write(&index_path, index_json)?;
+    dbt_vfs::fs::write(&index_path, index_json)?;
 
     Ok(RecordingResult {
         events_path,
@@ -239,15 +239,15 @@ impl SyncWriter {
         header: &RecordingHeader,
     ) -> io::Result<Self> {
         let output_path = output_path.into();
-        std::fs::create_dir_all(&output_path)?;
+        dbt_vfs::fs::create_dir_all(&output_path)?;
 
         let header_path = output_path.join("header.json");
         let header_json = serde_json::to_string_pretty(header)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        std::fs::write(header_path, header_json)?;
+        dbt_vfs::fs::write(header_path, header_json)?;
 
         let events_path = output_path.join("events.ndjson.gz");
-        let file = std::fs::File::create(events_path)?;
+        let file = dbt_vfs::fs::File::create(events_path)?;
         let writer: Box<dyn Write + Send> = Box::new(flate2::write::GzEncoder::new(
             file,
             flate2::Compression::fast(),
@@ -294,7 +294,7 @@ impl SyncWriter {
         let index_path = self.output_path.join("index.json");
         let index_json = serde_json::to_string_pretty(&self.index)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        std::fs::write(&index_path, index_json)?;
+        dbt_vfs::fs::write(&index_path, index_json)?;
 
         let events_path = if self.compress {
             self.output_path.join("events.ndjson.gz")

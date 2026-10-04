@@ -145,7 +145,7 @@ pub fn read_to_arrow_records(
     path: &Path,
     options: &CustomCsvOptions,
 ) -> Result<CsvReadResult, ArrowError> {
-    let data = std::fs::read(path).map_err(|e| ArrowError::CsvError(e.to_string()))?;
+    let data = dbt_vfs::fs::read(path).map_err(|e| ArrowError::CsvError(e.to_string()))?;
 
     // Determine if file has a header row (agate compatibility)
     // If first line is empty, eat the line and treat as no-header (autogen letter name)

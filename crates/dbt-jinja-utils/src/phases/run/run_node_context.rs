@@ -1,8 +1,9 @@
 //! This module contains the scope for materializing nodes
 
+use dbt_vfs::PathExt as _;
+use dbt_vfs::fs;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -680,7 +681,7 @@ fn write_file(full_path: &Path, resource_type: &str, payload: &str) -> Result<()
 
     // Create parent directories if needed
     if let Some(parent) = full_path.parent()
-        && !parent.exists()
+        && !parent.vfs_exists()
         && let Err(e) = fs::create_dir_all(parent)
     {
         return Err(Error::new(

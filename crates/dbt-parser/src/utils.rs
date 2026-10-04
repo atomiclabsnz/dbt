@@ -16,6 +16,7 @@ use dbt_schemas::schemas::project::{ResolvableConfig, ResolvedConfig};
 use dbt_schemas::schemas::properties::ModelProperties;
 use dbt_schemas::schemas::telemetry::NodeType;
 use dbt_schemas::state::DbtPackage;
+use dbt_vfs::PathExt as _;
 use minijinja::ArgSpec;
 use minijinja::compiler::ast::{CallArg, Expr, MacroKind, Stmt};
 use minijinja::compiler::parser::Parser;
@@ -1000,7 +1001,7 @@ pub fn clear_package_diagnostics(io: &IoArgs, package: &DbtPackage) {
 
         // 1. Add dbt_project.yml if it exists
         let project_file_path = package.package_root_path.join("dbt_project.yml");
-        if project_file_path.exists() {
+        if project_file_path.vfs_exists() {
             // Get the relative path to the workspace root (arg.io.in_dir)
             if let Ok(workspace_path) = stdfs::diff_paths(&project_file_path, &io.in_dir) {
                 file_paths.push(DbtPath::from(io.in_dir.join(workspace_path)));

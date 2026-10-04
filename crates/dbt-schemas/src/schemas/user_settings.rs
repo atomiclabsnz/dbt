@@ -24,7 +24,7 @@ impl UserSettings {
 
     /// Load from an arbitrary path. Returns `None` if the file can't be read or parsed.
     pub fn load_from(path: &Path) -> Option<Self> {
-        let content = std::fs::read_to_string(path).ok()?;
+        let content = dbt_vfs::fs::read_to_string(path).ok()?;
         dbt_yaml::from_str(&content).ok()
     }
 

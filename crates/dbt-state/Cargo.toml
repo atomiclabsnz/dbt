@@ -18,6 +18,7 @@ path = "src/mod.rs"
 
 
 [dependencies]
+dbt-vfs = { workspace = true }
 dbt-adapter = { workspace = true }
 dbt-cloud-config = { workspace = true }
 dbt-common = { workspace = true }

@@ -15,6 +15,7 @@ use dbt_common::{
 };
 use dbt_error::FsError;
 use dbt_features::feature_stack::FeatureStack;
+use dbt_vfs::PathExt as _;
 use std::io::{self, Write};
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -40,7 +41,7 @@ const FS_DEFAULT_MAX_BLOCKING_THREADS: usize = 512;
 fn maybe_load_dotenv() {
     if let Ok(cwd) = std::env::current_dir() {
         let env_path = cwd.join(".env");
-        if env_path.is_file() {
+        if env_path.vfs_is_file() {
             // from_path does NOT override existing env vars, which is exactly what we want:
             // shell env vars take precedence over .env file values
             let _ = dotenvy::from_path(&env_path);
