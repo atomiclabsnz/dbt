@@ -1,3 +1,6 @@
+// ferrion-wasm: the native-only transport is cfg'd out on wasm, which leaves
+// its imports and helpers unused there. Native builds keep full lint coverage.
+#![cfg_attr(target_arch = "wasm32", allow(unused_imports, dead_code))]
 mod steps;
 
 mod add_package;

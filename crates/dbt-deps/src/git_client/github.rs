@@ -43,7 +43,8 @@ impl GitHubClient {
     }
 }
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl GitHostClient for GitHubClient {
     /// Eligible when the URL parses as a github.com URL with owner+repo
     /// names that pass `is_gh_repo_valid_name` (interpolation safety for

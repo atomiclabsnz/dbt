@@ -75,12 +75,12 @@ impl Builder {
     /// shared libraries). An embedder supplies its own `AdapterEngine` instead.
     #[cfg(target_arch = "wasm32")]
     pub fn try_load(&self) -> Result<Box<dyn Driver>> {
-        Err(adbc_core::error::Error::with_message_and_status(
+        Err(Error::with_message_and_status(
             format!(
                 "ADBC driver loading is not available on wasm (backend: {})",
                 self.backend
             ),
-            adbc_core::error::Status::NotImplemented,
+            Status::NotImplemented,
         ))
     }
 }

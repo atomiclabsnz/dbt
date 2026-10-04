@@ -17,7 +17,8 @@ use super::{
 /// [`download_supports_revision`](GitHostClient::download_supports_revision) when the defaults do not
 /// match the transport. Default [`resolve`](GitHostClient::resolve) and [`install`](GitHostClient::install)
 /// compose those hooks.
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 pub trait GitHostClient: Send + Sync {
     /// Primary fast-path gate for `parsed` (`get_git_client`).
     fn can_handle(&self, _parsed: &ParsedGitUrl) -> bool {

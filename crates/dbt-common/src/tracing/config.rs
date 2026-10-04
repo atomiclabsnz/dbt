@@ -91,6 +91,7 @@ pub struct FsTraceConfig {
     pub(super) parent_span_id: Option<u64>,
     /// If True, traces will be forwarded to OTLP endpoints, if any
     /// are set via OTEL environment variables. See `OTLPExporterLayer::new`
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     pub(super) export_to_otlp: bool,
     /// The log format being used
     pub(super) log_format: LogFormat,

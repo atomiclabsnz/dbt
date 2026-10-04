@@ -47,6 +47,37 @@ mod afs {
     pub async fn rename(a: impl AsRef<Path>, b: impl AsRef<Path>) -> io::Result<()> {
         std::fs::rename(a, b)
     }
+
+    /// The subset of `tokio::fs::ReadDir` the workspace uses.
+    pub struct ReadDir(std::fs::ReadDir);
+
+    impl ReadDir {
+        pub async fn next_entry(&mut self) -> io::Result<Option<DirEntry>> {
+            self.0.next().transpose().map(|e| e.map(DirEntry))
+        }
+    }
+
+    /// The subset of `tokio::fs::DirEntry` the workspace uses.
+    pub struct DirEntry(std::fs::DirEntry);
+
+    impl DirEntry {
+        pub fn path(&self) -> PathBuf {
+            self.0.path()
+        }
+        pub fn file_name(&self) -> std::ffi::OsString {
+            self.0.file_name()
+        }
+        pub async fn file_type(&self) -> io::Result<std::fs::FileType> {
+            self.0.file_type()
+        }
+        pub async fn metadata(&self) -> io::Result<std::fs::Metadata> {
+            self.0.metadata()
+        }
+    }
+
+    pub async fn read_dir(p: impl AsRef<Path>) -> io::Result<ReadDir> {
+        std::fs::read_dir(p).map(ReadDir)
+    }
 }
 
 use crate::error::LiftableResult;
@@ -183,11 +214,10 @@ pub async fn rename(from: impl AsRef<Path>, to: impl AsRef<Path>) -> FsResult<()
     ))
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 /// Wrapper around [`tokio::fs::read_dir`] that returns a useful error in case of failure.
-pub async fn read_dir(path: impl AsRef<Path>) -> FsResult<tokio::fs::ReadDir> {
+pub async fn read_dir(path: impl AsRef<Path>) -> FsResult<afs::ReadDir> {
     let path = path.as_ref();
-    tokio::fs::read_dir(path)
+    afs::read_dir(path)
         .await
         .lift(ectx!("Failed to read directory: {}", path.display()))
 }

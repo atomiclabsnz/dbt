@@ -7,6 +7,7 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use dbt_common::{ErrorCode, FsResult, fs_err, tokiofs};
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::process::Command;
 
 use super::ParsedGitUrl;
@@ -16,7 +17,8 @@ use super::{DownloadMethod, DownloadOutcome, ResolveMethod};
 /// Generic git client — uses `git init + fetch + checkout` for any URL.
 pub struct GenericClient;
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl GitHostClient for GenericClient {
     fn download_supports_revision(&self) -> bool {
         true
@@ -63,6 +65,7 @@ enum GitErr {
 /// `sparse-checkout`) must not use this helper.
 ///
 /// `LC_ALL=C` is set so error-message matching in callers is stable.
+#[cfg(not(target_arch = "wasm32"))]
 async fn run_git(args: &[&str], cwd: Option<&Path>) -> Result<Vec<u8>, GitErr> {
     let mut cmd = Command::new("git");
     cmd.args(args).env("LC_ALL", "C");
@@ -77,6 +80,16 @@ async fn run_git(args: &[&str], cwd: Option<&Path>) -> Result<Vec<u8>, GitErr> {
         });
     }
     Ok(output.stdout)
+}
+
+/// ferrion-wasm: there is no `git` process to spawn on wasm. Git packages must
+/// be pre-installed into `dbt_packages/` of the virtual project.
+#[cfg(target_arch = "wasm32")]
+async fn run_git(args: &[&str], _cwd: Option<&Path>) -> Result<Vec<u8>, GitErr> {
+    Err(GitErr::Io(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        format!("cannot run `git {}` on wasm", args.join(" ")),
+    )))
 }
 
 /// Analyze git stderr and return a user-friendly error message.

@@ -363,7 +363,8 @@ impl HostClient<'_> {
     }
 }
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl traits::GitHostClient for HostClient<'_> {
     fn download_supports_revision(&self) -> bool {
         self.primary.download_supports_revision()

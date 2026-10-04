@@ -1,3 +1,4 @@
+#![cfg_attr(target_arch = "wasm32", allow(dead_code))]
 use crate::adapter::adapter_impl::AdapterImpl;
 
 use base64::Engine;
