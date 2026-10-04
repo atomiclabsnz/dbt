@@ -108,6 +108,7 @@ NON_PATH_RECEIVER = re.compile(
 # stripped, why). Every rewrite on such a line is skipped.
 EXCEPTIONS: list[tuple[str, str, str]] = [
     ("dbt-loader/src/upload_artifact_ingest.rs", '.map(|m| m.is_file() && m.len() > 0)', "receiver is Metadata"),
+    ("dbt-main/src/dbt_lib.rs", ".and_then(std::fs::metadata)", "host file (the executable), set by a PATCH"),
 ]
 
 # One-off edits (file, old, new, why), applied to the mechanically rewritten
@@ -165,6 +166,23 @@ impl File {""",
             .err()
         {""",
         "dbtignore: read through the VFS, not GitignoreBuilder::add's std::fs",
+    ),
+    (
+        "dbt-main/src/dbt_lib.rs",
+        """        let exe_path = env::current_exe()
+            .map_err(|e| fs_err!(ErrorCode::IoError, "Failed to get current exe path: {}", e))?;
+        let modified_time = stdfs::last_modified(&exe_path)?;
+""",
+        """        // ferrion-wasm: the binary's own mtime is a host file, not a project
+        // file: read it from the real disk, best effort (a wasm module has no
+        // executable path, and the VFS does not hold the binary).
+        #[allow(clippy::disallowed_methods)]
+        let modified_time = env::current_exe()
+            .and_then(std::fs::metadata)
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::UNIX_EPOCH);
+""",
+        "debug build-info: the executable's mtime is read from the host disk, best effort",
     ),
 ]
 

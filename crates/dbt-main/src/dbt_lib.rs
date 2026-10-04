@@ -632,9 +632,14 @@ fn emit_version_info(eval_arg: &EvalArgs, command_name: &str) -> FsResult<()> {
     {
         use chrono::{DateTime, Local};
         use std::env;
-        let exe_path = env::current_exe()
-            .map_err(|e| fs_err!(ErrorCode::IoError, "Failed to get current exe path: {}", e))?;
-        let modified_time = stdfs::last_modified(&exe_path)?;
+        // ferrion-wasm: the binary's own mtime is a host file, not a project
+        // file: read it from the real disk, best effort (a wasm module has no
+        // executable path, and the VFS does not hold the binary).
+        #[allow(clippy::disallowed_methods)]
+        let modified_time = env::current_exe()
+            .and_then(std::fs::metadata)
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::UNIX_EPOCH);
 
         // Convert SystemTime to DateTime<Local>
         let datetime: DateTime<Local> = DateTime::from(modified_time);
