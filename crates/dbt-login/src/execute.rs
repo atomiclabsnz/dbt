@@ -131,7 +131,12 @@ pub async fn execute_login(
 
         println!("Opening your browser to complete login...");
         println!("{}", console::style(&combined).bold());
-        if let Err(_err) = open::that_detached(&combined) {
+        #[cfg(not(target_arch = "wasm32"))]
+        let opened = open::that_detached(&combined).is_ok();
+        // ferrion-wasm: the system browser opener (`open`) is native only.
+        #[cfg(target_arch = "wasm32")]
+        let opened = false;
+        if !opened {
             println!(
                 "Cannot open browser. Please paste the URL above into your browser to authorize \
                 the dbt CLI."

@@ -1,3 +1,6 @@
+// ferrion-wasm: the loopback redirect listener is native only; what it leaves unused is allowed on wasm only.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports))]
+
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -7,7 +10,9 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use rand::RngCore;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::net::{TcpListener, TcpStream};
 use url::Url;
 
@@ -57,16 +62,21 @@ pub(crate) fn generate_state() -> String {
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 const SUCCESS_HTML: &str = "<!doctype html><html><head><meta charset=\"UTF-8\"/><title>dbt State - Login</title></head><body style=\"text-align:center;font-family:sans-serif\"><h1>Success</h1><p>You have logged in. You can close this window.</p></body></html>";
+#[cfg(not(target_arch = "wasm32"))]
 const ERROR_HTML_PREFIX: &str = "<!doctype html><html><head><meta charset=\"UTF-8\"/><title>dbt State - Login</title></head><body style=\"text-align:center;font-family:sans-serif\"><h1>Error</h1><p>";
+#[cfg(not(target_arch = "wasm32"))]
 const ERROR_HTML_SUFFIX: &str = "</p></body></html>";
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, PartialEq)]
 pub(crate) struct RedirectResult {
     pub code: String,
     pub state: String,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) async fn accept_one_redirect(
     listener: &TcpListener,
     expected_state: &str,
@@ -101,6 +111,7 @@ pub(crate) async fn accept_one_redirect(
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 async fn handle_redirect(
     stream: TcpStream,
     expected_state: &str,
@@ -156,6 +167,7 @@ async fn handle_redirect(
     Ok(RedirectResult { code, state })
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn parse_request_target(request_line: &str) -> Result<String, RunCacheServiceError> {
     let mut parts = request_line.split_whitespace();
     let _method = parts.next();
@@ -165,6 +177,7 @@ fn parse_request_target(request_line: &str) -> Result<String, RunCacheServiceErr
     Ok(target.to_string())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn parse_query(target: &str) -> HashMap<String, String> {
     let url = Url::parse(&format!("http://127.0.0.1{target}")).ok();
     let mut map = HashMap::new();
@@ -176,12 +189,14 @@ fn parse_query(target: &str) -> HashMap<String, String> {
     map
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 async fn write_response(
     stream: &mut tokio::net::tcp::OwnedWriteHalf,
     status: u16,
@@ -279,7 +294,7 @@ pub struct BrowserFlow {
 impl BrowserFlow {
     pub fn default_opener() -> Opener {
         Box::new(|url: &str| {
-            if let Err(err) = open::that_detached(url) {
+            if let Err(err) = open_system_browser(url) {
                 tracing::warn!(
                     "failed to open browser automatically: {err}. \
                     Open the following URL manually:\n{url}"
@@ -293,6 +308,20 @@ impl BrowserFlow {
     pub fn has_attached_terminal() -> bool {
         std::io::IsTerminal::is_terminal(&std::io::stdout())
     }
+}
+
+/// ferrion-wasm: the system browser opener (`open`) is native only.
+#[cfg(not(target_arch = "wasm32"))]
+fn open_system_browser(url: &str) -> std::io::Result<()> {
+    open::that_detached(url)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn open_system_browser(_url: &str) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "no system browser opener on wasm",
+    ))
 }
 
 pub(crate) async fn send_token_form(
@@ -342,11 +371,22 @@ async fn send_token_form_once(
         .map_err(|err| RunCacheServiceError::Auth(format!("invalid OAuth token response: {err}")))
 }
 
+/// ferrion-wasm: reqwest only classifies connect errors natively.
+#[cfg(not(target_arch = "wasm32"))]
+fn is_connect_error(err: &reqwest::Error) -> bool {
+    err.is_connect()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn is_connect_error(_err: &reqwest::Error) -> bool {
+    false
+}
+
 pub(crate) fn is_retryable_token_error(err: &RunCacheServiceError) -> bool {
     let RunCacheServiceError::AuthRequest(err) = err else {
         return false;
     };
-    if err.is_timeout() || err.is_connect() {
+    if err.is_timeout() || is_connect_error(err) {
         return true;
     }
     err.status()
@@ -364,6 +404,18 @@ impl InteractiveFlow for BrowserFlow {
         self.available
     }
 
+    /// ferrion-wasm: the OAuth redirect lands on a loopback TCP listener,
+    /// which a wasm module cannot open.
+    #[cfg(target_arch = "wasm32")]
+    async fn run(&self) -> Result<TokenResponse, RunCacheServiceError> {
+        Err(RunCacheServiceError::Auth(format!(
+            "interactive dbt State login needs a loopback listener on port {}, \
+             which is unavailable on wasm",
+            self.redirect_port
+        )))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     async fn run(&self) -> Result<TokenResponse, RunCacheServiceError> {
         let redirect_uri = format!("http://127.0.0.1:{}/handler", self.redirect_port);
         let listener = TcpListener::bind(("127.0.0.1", self.redirect_port))

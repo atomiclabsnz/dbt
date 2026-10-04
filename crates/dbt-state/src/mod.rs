@@ -4,6 +4,7 @@ pub mod hash;
 pub mod metadata_cache;
 pub mod node_session;
 pub mod proto;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod redis_config;
 pub mod request_builder;
 pub mod run_cache_defer;
@@ -11,5 +12,6 @@ pub mod service_client;
 pub mod service_config;
 pub mod task_cache;
 pub mod task_cache_noop;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod task_cache_redis;
 pub mod view_traversal;

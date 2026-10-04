@@ -526,7 +526,8 @@ tokio-util = { version = "0.7", features = ["io", "compat"] }
 arc-swap = { version = "1.7.1" }
 
 # pretty
-comfy-table = { version = "7.1.1" }
+# ferrion-wasm: `tty` (crossterm) is re-added natively by dbt-pretty-table.
+comfy-table = { version = "7.1.1", default-features = false }
 indicatif = { version = "0.18.4" }
 
 # repl
@@ -627,7 +628,11 @@ quote = "1"
 syn = { version = "2", features = ["full"] }
 
 # gRPC dependencies
-tonic = { version = "0.14.1", features = ["transport", "tls-native-roots"] }
+# ferrion-wasm: codegen only here (Status, Code, metadata, generated clients).
+# The HTTP/2 transport (hyper, socket2, tokio `net`, native roots) is re-added
+# by dbt-state and dbt-tasks-core under cfg(not(target_arch = "wasm32")),
+# together with tonic's defaults, so the native feature set is unchanged.
+tonic = { version = "0.14.1", default-features = false, features = ["codegen"] }
 tonic-build = "0.14.1"
 tonic-prost = "0.14.1"
 tonic-prost-build = "0.14.1"
@@ -658,7 +663,9 @@ tracy-client = { version = "=0.18.0", default-features = false }
 unicode-segmentation = "1.12"
 
 # axum dependency
-axum = "0.8.5"
+# ferrion-wasm: no defaults here; dbt-docs-server (the only member using it)
+# re-adds every default, with `http1` and `tokio` (axum::serve) native only.
+axum = { version = "0.8.5", default-features = false }
 tower = "0.5.2"
 tower-http = { version = "0.6", features = ["trace"] }
 utoipa = { version = "5", features = ["axum_extras"] }

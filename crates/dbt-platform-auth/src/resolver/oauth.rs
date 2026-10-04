@@ -1,3 +1,7 @@
+// ferrion-wasm: the loopback redirect listener is native only; the HTML and
+// query helpers it uses are dead code on wasm.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code))]
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
@@ -7,7 +11,9 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use rand::RngCore;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::net::{TcpListener, TcpStream};
 use url::Url;
 
@@ -256,7 +262,7 @@ impl OAuthInteractiveResolver {
     /// Default opener: opens the URL in the system browser.
     pub fn default_opener() -> Opener {
         Box::new(|url: &str| {
-            if let Err(err) = open::that_detached(url) {
+            if let Err(err) = open_system_browser(url) {
                 tracing::warn!(
                     "failed to open browser automatically: {err}. \
                     Open the following URL manually:\n{url}"
@@ -299,11 +305,7 @@ impl OAuthInteractiveResolver {
             merge_scopes(&self.scopes, &cached_scopes)
         };
 
-        let listener = TcpListener::bind(("127.0.0.1", self.redirect_port))
-            .await
-            .map_err(|e| {
-                AuthError::Interactive(format!("loopback port {} in use: {e}", self.redirect_port))
-            })?;
+        let listener = bind_loopback(self.redirect_port).await?;
 
         let pkce = generate_pkce();
         let state = generate_state();
@@ -485,6 +487,20 @@ impl OAuthInteractiveResolverBuilder {
 
 /// Returns `true` if every scope in `requested` is present in `cached`.
 /// An empty `requested` list always returns `true`.
+/// ferrion-wasm: the system browser opener (`open`) is native only.
+#[cfg(not(target_arch = "wasm32"))]
+fn open_system_browser(url: &str) -> std::io::Result<()> {
+    open::that_detached(url)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn open_system_browser(_url: &str) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "no system browser opener on wasm",
+    ))
+}
+
 fn scopes_adequate(requested: &[String], cached: &[String]) -> bool {
     if requested.is_empty() {
         return true;
@@ -566,8 +582,41 @@ struct RedirectResult {
     account_url: String,
 }
 
+/// The OAuth redirect listener. ferrion-wasm: a wasm module cannot accept TCP
+/// connections, so there it is uninhabited and binding always fails.
+#[cfg(not(target_arch = "wasm32"))]
+type Loopback = TcpListener;
+#[cfg(target_arch = "wasm32")]
+enum Loopback {}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn bind_loopback(port: u16) -> Result<Loopback, AuthError> {
+    TcpListener::bind(("127.0.0.1", port))
+        .await
+        .map_err(|e| AuthError::Interactive(format!("loopback port {port} in use: {e}")))
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn bind_loopback(port: u16) -> Result<Loopback, AuthError> {
+    Err(AuthError::Interactive(format!(
+        "interactive dbt platform login needs a loopback listener on port {port}, \
+         which is unavailable on wasm"
+    )))
+}
+
+#[cfg(target_arch = "wasm32")]
 async fn accept_one_redirect(
-    listener: &TcpListener,
+    listener: &Loopback,
+    _expected_state: &str,
+    _timeout: Duration,
+    _abort_rx: Option<tokio::sync::oneshot::Receiver<()>>,
+) -> Result<RedirectResult, AuthError> {
+    match *listener {}
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn accept_one_redirect(
+    listener: &Loopback,
     expected_state: &str,
     timeout: Duration,
     abort_rx: Option<tokio::sync::oneshot::Receiver<()>>,
@@ -615,6 +664,7 @@ fn truncate_chars(s: &str, max_chars: usize) -> &str {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 async fn handle_redirect(
     stream: TcpStream,
     expected_state: &str,
@@ -705,6 +755,7 @@ fn html_escape(s: &str) -> String {
         .replace('>', "&gt;")
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 async fn write_http_response(
     stream: &mut tokio::net::tcp::OwnedWriteHalf,
     status: u16,

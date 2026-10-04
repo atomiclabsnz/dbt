@@ -22,7 +22,6 @@ dbt-fusion-workspace-hack = { version = "0.1" }
 dbt-schemas = { workspace = true }
 dbt-yaml = { workspace = true }
 dirs = { workspace = true }
-open = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
@@ -36,5 +35,7 @@ url = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 
+# ferrion-wasm: the system browser opener is native only.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+open = { workspace = true }
 tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

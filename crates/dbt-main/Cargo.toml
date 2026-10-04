@@ -53,8 +53,6 @@ dbt-telemetry = { workspace = true }
 dbt-vortex = { workspace = true }
 
 arrow = { workspace = true }
-astral-tokio-tar = { workspace = true }
-async-compression = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
@@ -66,7 +64,6 @@ minijinja = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }
 run_script = { workspace = true }
-rustls = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
@@ -90,5 +87,10 @@ ignored = ["dbt-fusion-workspace-hack"]
 doctest = false
 path = "src/lib.rs"
 
+# ferrion-wasm: rustls (the aws-lc crypto provider installed at startup) and
+# the self-updater's tarball extraction are native only.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+astral-tokio-tar = { workspace = true }
+async-compression = { workspace = true }
+rustls = { workspace = true }
 tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

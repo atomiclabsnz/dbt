@@ -1,3 +1,6 @@
+// ferrion-wasm: the gRPC client and its header constants are native only; what it leaves unused is allowed on wasm only.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports))]
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -6,11 +9,10 @@ use async_trait::async_trait;
 use dbt_common::ErrorCode;
 use dbt_common::tracing::dbt_emit::emit_warn_log_message;
 use thiserror::Error;
-use tonic::{
-    Request, Response,
-    metadata::MetadataValue,
-    transport::{Channel, ClientTlsConfig, Endpoint},
-};
+use tonic::{Request, Response, metadata::MetadataValue};
+// ferrion-wasm: tonic's HTTP/2 transport is native only.
+#[cfg(not(target_arch = "wasm32"))]
+use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 
 use crate::auth::OAuthTokenSource;
 use crate::auth::browser_flow::is_retryable_token_error;
@@ -57,6 +59,7 @@ pub enum RunCacheServiceError {
     Disabled,
     #[error(transparent)]
     Config(#[from] RunCacheServiceConfigError),
+    #[cfg(not(target_arch = "wasm32"))]
     #[error("dbt State service transport failed: {0}")]
     Transport(#[from] tonic::transport::Error),
     #[error("dbt State service authentication request failed: {0}")]
@@ -87,6 +90,7 @@ impl RunCacheServiceError {
         match self {
             Self::Disabled => "Disabled",
             Self::Config(_) => "Config",
+            #[cfg(not(target_arch = "wasm32"))]
             Self::Transport(_) => "Transport",
             Self::AuthRequest(_) => "AuthRequest",
             Self::Auth(_) => "Auth",
@@ -335,6 +339,7 @@ pub trait RunCacheServiceClient: Send + Sync {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone)]
 pub struct GrpcRunCacheServiceClient {
     sql: SqlClient<Channel>,
@@ -348,6 +353,7 @@ pub struct GrpcRunCacheServiceClient {
     disabled: Arc<AtomicBool>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl GrpcRunCacheServiceClient {
     pub async fn connect(config: RunCacheServiceConfig) -> Result<Self, RunCacheServiceError> {
         Self::connect_with_metadata(config, RunCacheClientMetadata::default()).await
@@ -436,6 +442,62 @@ impl GrpcRunCacheServiceClient {
     }
 }
 
+/// ferrion-wasm: there is no gRPC transport on wasm, so the client cannot be
+/// constructed. `connect` fails with an `Unavailable` RPC status, which every
+/// caller already handles by executing without the dbt State service.
+#[cfg(target_arch = "wasm32")]
+#[derive(Debug, Clone)]
+pub enum GrpcRunCacheServiceClient {}
+
+#[cfg(target_arch = "wasm32")]
+impl GrpcRunCacheServiceClient {
+    pub async fn connect(config: RunCacheServiceConfig) -> Result<Self, RunCacheServiceError> {
+        Self::connect_with_metadata(config, RunCacheClientMetadata::default()).await
+    }
+
+    pub async fn connect_with_metadata(
+        config: RunCacheServiceConfig,
+        _metadata: RunCacheClientMetadata,
+    ) -> Result<Self, RunCacheServiceError> {
+        if !config.enabled {
+            return Err(RunCacheServiceError::Disabled);
+        }
+        Err(RunCacheServiceError::Rpc(tonic::Status::unavailable(
+            "the dbt State gRPC transport is unavailable on wasm",
+        )))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[async_trait]
+impl RunCacheServiceClient for GrpcRunCacheServiceClient {
+    async fn validate_client_version(&self) -> Result<ClientVersionStatus, RunCacheServiceError> {
+        match *self {}
+    }
+
+    async fn submit_enriched_sql(
+        &self,
+        _request: SubmitEnrichedSqlRequest,
+    ) -> Result<SubmitSqlResponse, RunCacheServiceError> {
+        match *self {}
+    }
+
+    async fn submit_values(
+        &self,
+        _request: SubmitValuesRequest,
+    ) -> Result<SubmitSqlResponse, RunCacheServiceError> {
+        match *self {}
+    }
+
+    async fn confirm_execution(
+        &self,
+        _request: ConfirmExecutionRequest,
+    ) -> Result<ConfirmExecutionResponse, RunCacheServiceError> {
+        match *self {}
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 #[async_trait]
 impl RunCacheServiceClient for GrpcRunCacheServiceClient {
     fn is_disabled(&self) -> bool {

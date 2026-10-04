@@ -19,6 +19,8 @@
 //! parquet artifacts over this server, and the index writes no file for a table with
 //! no rows — so "absent" is a normal answer the client handles, and answering it with
 //! an HTML document instead is not.
+// ferrion-wasm: `dbt docs serve` is native only; what it leaves unused is allowed on wasm only.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports))]
 
 use std::path::{Component, Path, PathBuf};
 
@@ -125,6 +127,7 @@ pub(crate) fn not_found() -> Response {
 ///
 /// Falls through to the embedded bundle when the directory has no `index.html`,
 /// so a stale or half-written site still shows the app rather than nothing.
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn serve_site_dir(site_dir: &Path, uri: Uri) -> Response {
     if let Some(path) = resolve_within(site_dir, uri.path())
         && let Ok(bytes) = tokio::fs::read(&path).await

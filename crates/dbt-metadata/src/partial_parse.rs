@@ -318,6 +318,14 @@ pub struct GitInfo {
     pub is_dirty: bool,
 }
 
+/// ferrion-wasm: gitoxide is native only; on wasm the project is treated as
+/// not being inside a git repository, which callers already handle.
+#[cfg(target_arch = "wasm32")]
+pub fn read_git_info(_project_root: &Path) -> Option<GitInfo> {
+    None
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub fn read_git_info(project_root: &Path) -> Option<GitInfo> {
     let (repo_path, _) = gix_discover::upwards(project_root).ok()?;
     let repo = gix::open(repo_path.as_ref()).ok()?;

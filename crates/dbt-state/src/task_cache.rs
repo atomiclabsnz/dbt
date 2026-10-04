@@ -1,12 +1,15 @@
+// ferrion-wasm: the Redis heartbeat constants are native only; what it leaves unused is allowed on wasm only.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports))]
+
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use dbt_schemas::schemas::ResolvedCloudConfig;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, atomic::AtomicBool};
 
-use crate::{
-    redis_config::RedisConfig, task_cache_noop::TaskCacheNoop, task_cache_redis::TaskCacheRedis,
-};
+use crate::task_cache_noop::TaskCacheNoop;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::{redis_config::RedisConfig, task_cache_redis::TaskCacheRedis};
 
 /// This enum is used to track the status of a task, such as whether it has started,
 #[derive(Debug, PartialEq)]
@@ -24,6 +27,23 @@ pub(crate) const MAX_DELAY: Duration = Duration::seconds(32); // max 32 seconds
 pub(crate) const BUFFER_TIME: Duration = Duration::seconds(2); // 2 seconds
 
 /// Create a task manager based on the provided URL.
+///
+/// ferrion-wasm: only the no-op task cache exists on wasm; the Redis backends
+/// (and their GCP IAM auth) are native only.
+#[cfg(target_arch = "wasm32")]
+pub async fn create_task_cache(
+    url: &str,
+    _cloud_config: Option<&ResolvedCloudConfig>,
+) -> Result<Arc<dyn TaskCache>, String> {
+    if url == "noop" {
+        Ok(Arc::new(TaskCacheNoop::new()))
+    } else {
+        Err(format!("Unsupported task manager on wasm: {url} (only 'noop')"))
+    }
+}
+
+/// Create a task manager based on the provided URL.
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn create_task_cache(
     url: &str,
     cloud_config: Option<&ResolvedCloudConfig>,

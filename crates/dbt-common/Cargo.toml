@@ -97,3 +97,6 @@ getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
 getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 uuid = { workspace = true, features = ["js"] }
+# rustls (via ureq in vortex-client) reads the clock through pki-types, which
+# needs `web` (web-time) on wasm32-unknown-unknown.
+rustls-pki-types = { version = "1", features = ["web"] }

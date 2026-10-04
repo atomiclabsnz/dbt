@@ -25,3 +25,8 @@ term_size = { workspace = true }
 name = "dbt_pretty_table"
 path = "src/lib.rs"
 doctest = false
+
+# ferrion-wasm: comfy-table's `tty` feature (crossterm terminal-width
+# detection and styling) is native only.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+comfy-table = { workspace = true, features = ["tty"] }

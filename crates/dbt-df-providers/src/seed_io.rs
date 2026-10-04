@@ -58,12 +58,25 @@ pub fn read_json_seed(
     Ok((schema, Some(batches)))
 }
 
+/// ferrion-wasm: tokio::fs is refused on wasm; there the parquet seed is read
+/// into memory with std::fs and streamed from a cursor (tokio implements
+/// AsyncRead/AsyncSeek for `std::io::Cursor`).
+#[cfg(not(target_arch = "wasm32"))]
+type SeedFile = tokio::fs::File;
+#[cfg(target_arch = "wasm32")]
+type SeedFile = std::io::Cursor<Vec<u8>>;
+
 /// Open `path` as a tokio file and build a parquet stream reader.
 async fn open_parquet_stream(
     path: &Path,
-) -> Result<ParquetRecordBatchStreamBuilder<tokio::fs::File>, DataFusionError> {
+) -> Result<ParquetRecordBatchStreamBuilder<SeedFile>, DataFusionError> {
+    #[cfg(not(target_arch = "wasm32"))]
     let file = tokio::fs::File::open(path)
         .await
+        .map_err(|e| DataFusionError::External(Box::new(e)))?;
+    #[cfg(target_arch = "wasm32")]
+    let file = std::fs::read(path)
+        .map(std::io::Cursor::new)
         .map_err(|e| DataFusionError::External(Box::new(e)))?;
     ParquetRecordBatchStreamBuilder::new(file)
         .await

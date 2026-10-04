@@ -2789,6 +2789,7 @@ dependencies = [
  "rand 0.9.5",
  "regex",
  "rust-embed",
+ "rustls-pki-types",
  "scc",
  "schemars 0.8.22",
  "serde",

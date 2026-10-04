@@ -42,12 +42,24 @@ mod assets;
 mod embed;
 pub mod export;
 pub mod providers;
+#[cfg(not(target_arch = "wasm32"))]
 mod server;
 pub mod state;
 
 pub use export::{ExportError, ExportOptions, ExportSummary, export_site, index_dir_has_artifacts};
 pub use providers::Providers;
+#[cfg(not(target_arch = "wasm32"))]
 pub use server::run_with_args;
+
+/// ferrion-wasm: `dbt docs serve` binds a TCP listener (axum::serve), which a
+/// wasm module cannot do. `export_site` is the wasm-side way to get docs.
+#[cfg(target_arch = "wasm32")]
+pub async fn run_with_args(_args: Arc<DocsServeArgs>, _providers: Providers) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "dbt docs serve needs a TCP listener, which is unavailable on wasm",
+    ))
+}
 pub use state::DistInfo;
 
 /// Resolve the directory containing parquet artifacts.

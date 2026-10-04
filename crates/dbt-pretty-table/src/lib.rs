@@ -395,11 +395,11 @@ fn create_table(column_names: &[String]) -> (Table, usize, Vec<usize>, bool) {
     let mut headers = Vec::new();
     for (i, column_name) in column_names.iter().enumerate() {
         if indices_to_include.contains(&i) {
-            headers.push(Cell::new(column_name).add_attribute(Attribute::Bold));
+            headers.push(bold(Cell::new(column_name)));
         }
     }
     if include_ellipsis {
-        headers.push(Cell::new(ELLIPSIS).add_attribute(Attribute::Bold));
+        headers.push(bold(Cell::new(ELLIPSIS)));
     }
     table.set_header(headers);
     (table, total_width, indices_to_include, include_ellipsis)
@@ -598,4 +598,16 @@ mod tests {
         assert_eq!(rows[0]["name"], "alice");
         assert!(rows[1]["name"].is_null());
     }
+}
+
+/// ferrion-wasm: cell attributes come from comfy-table's `tty` feature
+/// (crossterm), which is native only; on wasm headers are unstyled.
+#[cfg(not(target_arch = "wasm32"))]
+fn bold(cell: Cell) -> Cell {
+    cell.add_attribute(Attribute::Bold)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn bold(cell: Cell) -> Cell {
+    cell
 }

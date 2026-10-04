@@ -13,12 +13,16 @@
 //! - `VORTEX_DEV_MODE_OUTPUT_PATH` (default `/tmp/vortex_dev_mode_output.jsonl`): The path to the
 //!   file where the producer will write the messages.  Note that this file will be appended to, not
 //!   overwritten, so it can grow quite large!
+// ferrion-wasm: there is no sender worker thread on wasm; what it leaves unused is allowed on wasm only.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports, unused_mut))]
 use std::any::Any;
 use std::fs;
 use std::io::{self, Write as _};
 use std::path::PathBuf;
 use std::sync::{Mutex, mpsc};
-use std::thread::{self, JoinHandle};
+use std::thread::JoinHandle;
+#[cfg(not(target_arch = "wasm32"))]
+use std::thread;
 use std::time::{Duration, Instant};
 
 use http::HeaderValue;
@@ -480,6 +484,12 @@ impl VortexProducerClient {
             dev_mode_output_path,
             dev_mode_output_writer,
         };
+        // ferrion-wasm: a wasm module has no threads (std::thread::spawn
+        // panics), so there is no sender worker: the receiver is dropped and
+        // every log_proto is discarded, exactly as after shutdown.
+        #[cfg(target_arch = "wasm32")]
+        drop((agent, receiver));
+        #[cfg(not(target_arch = "wasm32"))]
         if !client.is_in_dev_mode() {
             let join_handle = Some(thread::spawn(move || worker_thread_loop(agent, receiver)));
             client.thread_handle = WorkerThread::new(join_handle);
