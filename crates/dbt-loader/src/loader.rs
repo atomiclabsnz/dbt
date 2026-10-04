@@ -485,25 +485,26 @@ pub async fn load(
     }
 
     // ferrion-wasm: the deps future (hub HTTP, git hosts) is !Send on wasm.
-    let (packages_lock, upstream_projects) = dbt_common::send_on_wasm::send_on_wasm(get_or_install_packages(
-        &arg.io,
-        arg.command,
-        &env,
-        &packages_install_path,
-        arg.install_deps,
-        arg.add_package.clone(),
-        arg.upgrade,
-        arg.lock,
-        arg.vars.clone(),
-        arg.version_check,
-        arg.skip_private_deps,
-        iarg.replay.as_ref(),
-        token,
-        use_v2_compatible_package_downloads,
-        private_package_resolver,
-        dbt_state.cloud_config.clone(),
-    ))
-    .await?;
+    let (packages_lock, upstream_projects) =
+        dbt_common::send_on_wasm::send_on_wasm(get_or_install_packages(
+            &arg.io,
+            arg.command,
+            &env,
+            &packages_install_path,
+            arg.install_deps,
+            arg.add_package.clone(),
+            arg.upgrade,
+            arg.lock,
+            arg.vars.clone(),
+            arg.version_check,
+            arg.skip_private_deps,
+            iarg.replay.as_ref(),
+            token,
+            use_v2_compatible_package_downloads,
+            private_package_resolver,
+            dbt_state.cloud_config.clone(),
+        ))
+        .await?;
 
     // Skip downloading publication artifacts in Time Machine replay mode
     // In replay mode, we're replaying a recorded session and don't need to download anything

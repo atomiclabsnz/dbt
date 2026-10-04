@@ -25,11 +25,9 @@ use std::{
 };
 use tracy_client::span;
 
-use crate::{
-    Backend, Connection, semaphore::Semaphore, snowflake, str_from_sqlstate,
-};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::connection::AdbcConnection;
+use crate::{Backend, Connection, semaphore::Semaphore, snowflake, str_from_sqlstate};
 
 mod builder;
 pub use builder::*;

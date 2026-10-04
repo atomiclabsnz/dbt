@@ -13,13 +13,13 @@ pub mod node_selector;
 pub mod pretty_string;
 pub mod relation_registry;
 pub mod seed_path_registry;
+pub mod send_on_wasm;
 pub mod source_lineage;
 pub mod static_analysis;
 pub mod stats;
 pub mod stdfs;
 pub mod string_utils;
 pub mod tokiofs;
-pub mod send_on_wasm;
 #[macro_use]
 pub extern crate dbt_error as error;
 pub use dbt_error::{

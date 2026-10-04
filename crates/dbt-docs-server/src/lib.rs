@@ -54,7 +54,10 @@ pub use server::run_with_args;
 /// ferrion-wasm: `dbt docs serve` binds a TCP listener (axum::serve), which a
 /// wasm module cannot do. `export_site` is the wasm-side way to get docs.
 #[cfg(target_arch = "wasm32")]
-pub async fn run_with_args(_args: Arc<DocsServeArgs>, _providers: Providers) -> std::io::Result<()> {
+pub async fn run_with_args(
+    _args: Arc<DocsServeArgs>,
+    _providers: Providers,
+) -> std::io::Result<()> {
     Err(std::io::Error::new(
         std::io::ErrorKind::Unsupported,
         "dbt docs serve needs a TCP listener, which is unavailable on wasm",

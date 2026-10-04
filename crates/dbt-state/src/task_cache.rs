@@ -38,7 +38,9 @@ pub async fn create_task_cache(
     if url == "noop" {
         Ok(Arc::new(TaskCacheNoop::new()))
     } else {
-        Err(format!("Unsupported task manager on wasm: {url} (only 'noop')"))
+        Err(format!(
+            "Unsupported task manager on wasm: {url} (only 'noop')"
+        ))
     }
 }
 

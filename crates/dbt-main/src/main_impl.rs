@@ -171,12 +171,9 @@ pub fn run_cli_with_code(cli: Box<Cli>, arg: SystemArgs, feature_stack: Arc<Feat
 
     // ferrion-wasm: on wasm the command futures that talk HTTP (reqwest over
     // fetch: deps, login, init, artifact upload, version check) are !Send.
-    let future = tokio_rt.spawn(dbt_common::send_on_wasm::send_on_wasm(execute_fs_and_shutdown(
-        arg,
-        cli,
-        Arc::clone(&feature_stack),
-        token,
-    )));
+    let future = tokio_rt.spawn(dbt_common::send_on_wasm::send_on_wasm(
+        execute_fs_and_shutdown(arg, cli, Arc::clone(&feature_stack), token),
+    ));
     let future = Box::pin(async {
         // JoinError is produced if future panics, so we .unwrap()
         future.await.unwrap()

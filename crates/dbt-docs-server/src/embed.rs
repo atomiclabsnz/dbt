@@ -1,6 +1,5 @@
 // ferrion-wasm: `dbt docs serve` is native only; what it leaves unused is allowed on wasm only.
 #![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports))]
-
 #![allow(clippy::disallowed_methods)] // RustEmbed generates calls to std::path::Path::canonicalize
 
 use std::borrow::Cow;

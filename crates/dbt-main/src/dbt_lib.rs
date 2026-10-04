@@ -289,21 +289,29 @@ pub async fn setup_and_execute_fs(
 is false. This should not happen."
         );
         let result_string = build_result_string(&result);
-        tokio::task::spawn_blocking(move || {
+        // ferrion-wasm: no blocking pool (no threads) on wasm, and no vortex
+        // worker to wait for: the final event is sent inline on a task.
+        #[cfg(target_arch = "wasm32")]
+        let end_event = tokio::spawn(async move {
+            invocation_end_event(invocation_id, result_string, dbt_distribution, shutdown);
+        });
+        #[cfg(not(target_arch = "wasm32"))]
+        let end_event = tokio::task::spawn_blocking(move || {
             // This blocks on the worker thread until the final batch(es)
             // are sent, so we run it as a blocking tokio task.
             invocation_end_event(invocation_id, result_string, dbt_distribution, shutdown);
-        })
-        .instrument(invocation_span)
-        .await
-        .map_err(|e| {
-            if e.is_cancelled() {
-                Ok(()) // ignore cancellation
-            } else {
-                Err(e) // let JoinError::Panic cause a panic
-            }
-        })
-        .unwrap();
+        });
+        end_event
+            .instrument(invocation_span)
+            .await
+            .map_err(|e| {
+                if e.is_cancelled() {
+                    Ok(()) // ignore cancellation
+                } else {
+                    Err(e) // let JoinError::Panic cause a panic
+                }
+            })
+            .unwrap();
     }
 
     // Hand the captured artifacts (if any) to the caller. Phase-checkpoint

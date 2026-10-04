@@ -36,6 +36,16 @@ where
     R: Send + 'static,
 {
     let span = tracing::Span::current();
+    // ferrion-wasm: tokio's blocking pool spawns OS threads, which a wasm
+    // module cannot do (it panics at the first spawn). On wasm the closure runs
+    // as an ordinary task on the (current-thread) runtime instead; the caller
+    // still gets a JoinHandle and awaits it the same way.
+    #[cfg(target_arch = "wasm32")]
+    return tokio::spawn(async move {
+        let _guard = span.enter();
+        f()
+    });
+    #[cfg(not(target_arch = "wasm32"))]
     tokio::task::spawn_blocking(move || {
         let _guard = span.enter();
         f()

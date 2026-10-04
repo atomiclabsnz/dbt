@@ -20,9 +20,9 @@ use std::fs;
 use std::io::{self, Write as _};
 use std::path::PathBuf;
 use std::sync::{Mutex, mpsc};
-use std::thread::JoinHandle;
 #[cfg(not(target_arch = "wasm32"))]
 use std::thread;
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use http::HeaderValue;
