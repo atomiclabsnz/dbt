@@ -35,3 +35,6 @@ url = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

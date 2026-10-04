@@ -53,3 +53,6 @@ tempfile = { workspace = true }
 doctest = true
 name = "dbt_parser"
 path = "src/lib.rs"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

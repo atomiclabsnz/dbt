@@ -150,7 +150,7 @@ pub fn diff_paths<P: AsRef<Path>, Q: AsRef<Path>>(to: P, from: Q) -> FsResult<Pa
 pub fn symlink<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> FsResult<()> {
     let from = from.as_ref();
     let to = to.as_ref();
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     {
         std::os::unix::fs::symlink(from, to).lift(ectx!(
             "Failed to create symlink from {} to {}",
@@ -161,6 +161,19 @@ pub fn symlink<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> FsResult<()> {
     #[cfg(target_os = "windows")]
     {
         std::os::windows::fs::symlink_dir(from, to).lift(ectx!(
+            "Failed to create symlink from {} to {}",
+            from.display(),
+            to.display()
+        ))
+    }
+    // ferrion-wasm: no symlinks on wasm (wasi's are unstable std API).
+    #[cfg(not(any(unix, target_os = "windows")))]
+    {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "symlinks are not supported on this target",
+        ))
+        .lift(ectx!(
             "Failed to create symlink from {} to {}",
             from.display(),
             to.display()

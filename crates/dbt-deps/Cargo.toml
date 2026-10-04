@@ -13,8 +13,6 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
-astral-tokio-tar = { workspace = true }
-async-compression = { workspace = true }
 async-trait = { workspace = true }
 dbt-common = { workspace = true }
 dbt-fusion-workspace-hack = { version = "0.1" }
@@ -38,7 +36,6 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
-vortex-events = { workspace = true }
 
 [dev-dependencies]
 dbt-telemetry = { workspace = true }
@@ -49,3 +46,11 @@ wiremock = "0.6"
 name = "fs_deps"
 path = "src/mod.rs"
 doctest = false
+
+# ferrion-wasm: tarball extraction (astral-tokio-tar needs tokio `fs`) and the
+# vortex usage-stats sender (ureq on a background thread) are native only.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+astral-tokio-tar = { workspace = true }
+async-compression = { workspace = true }
+vortex-events = { workspace = true }
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

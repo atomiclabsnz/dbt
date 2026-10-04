@@ -60,3 +60,6 @@ winapi = { version = "0.3", features = ["fileapi"] }
 name = "dbt_test_utils"
 doctest = false
 path = "src/mod.rs"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

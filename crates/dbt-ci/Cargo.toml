@@ -38,3 +38,6 @@ tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 toml_edit = { workspace = true }
 zip = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

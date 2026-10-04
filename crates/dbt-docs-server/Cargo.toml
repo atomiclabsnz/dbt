@@ -45,3 +45,6 @@ tracing = { workspace = true }
 [dev-dependencies]
 # tokio macros + rt-multi-thread already enabled by the workspace dep above.
 tempfile = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

@@ -5,16 +5,21 @@
 //! and automatic retry logic for transient failures.
 //! Supports selective extraction with root directory stripping and subdirectory filtering.
 
+#[cfg(not(target_arch = "wasm32"))]
 use async_compression::tokio::bufread::GzipDecoder;
 use dbt_common::cancellation::CancellationToken;
 use dbt_common::tracing::dbt_emit::emit_info_log_message;
 use dbt_common::{ErrorCode, FsResult, err, fs_err};
+#[cfg(not(target_arch = "wasm32"))]
 use futures::StreamExt;
 use reqwest::StatusCode;
 use reqwest_middleware::ClientWithMiddleware;
+#[cfg(not(target_arch = "wasm32"))]
 use std::io;
 use std::path::{Path, PathBuf};
+#[cfg(not(target_arch = "wasm32"))]
 use tokio_tar::{Archive, EntryType};
+#[cfg(not(target_arch = "wasm32"))]
 use tokio_util::io::StreamReader;
 
 /// Client for downloading and extracting tarball archives.
@@ -46,6 +51,7 @@ impl TarballClient {
     ///
     /// Streams download directly from network through gzip decoder to tar extractor,
     /// avoiding intermediate memory buffering or file I/O.
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn download_and_extract_tarball(
         &self,
         download_url: &str,
@@ -242,5 +248,25 @@ impl TarballClient {
         }
 
         Ok(target_path.to_path_buf())
+    }
+
+    /// ferrion-wasm: streaming tar extraction writes through `tokio::fs`, which
+    /// does not exist on wasm. Packages must be pre-installed into
+    /// `dbt_packages/` of the virtual project instead.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn download_and_extract_tarball(
+        &self,
+        download_url: &str,
+        _target_path: &Path,
+        _strip_root: bool,
+        _subdirectory: Option<&str>,
+        _headers: &[(&str, &str)],
+    ) -> FsResult<PathBuf> {
+        self.cancellation.check_cancellation()?;
+        err!(
+            ErrorCode::UnsupportedFusionFeature,
+            "Downloading and extracting {download_url} is not available on wasm; \
+             pre-install packages into dbt_packages/"
+        )
     }
 }

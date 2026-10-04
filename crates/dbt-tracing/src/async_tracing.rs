@@ -53,6 +53,7 @@ where
 ///     tracing::info!("This log will be in the parent span");
 /// });
 /// ```
+#[cfg(not(target_arch = "wasm32"))]
 pub fn spawn_traced_block_in_place<F>(future: F) -> F::Output
 where
     F: Future + Send + 'static,

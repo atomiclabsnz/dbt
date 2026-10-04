@@ -38,12 +38,14 @@ use crate::{
 };
 use dbt_error::{ErrorCode, FsError, FsResult};
 use dbt_telemetry::TelemetryEventTypeRegistry;
+// ferrion-wasm: the OTLP exporter is native only (see dbt-tracing/Cargo.toml).
+#[cfg(not(target_arch = "wasm32"))]
+use dbt_tracing::layers::otlp::{OtlpResourceConfig, build_otlp_layer};
 use dbt_tracing::{
     LogRecordInfo,
     layer::{ConsumerLayer, MiddlewareLayer},
     layers::{
         jsonl_writer::{build_jsonl_layer, build_jsonl_layer_with_background_writer},
-        otlp::{OtlpResourceConfig, build_otlp_layer},
         parquet_writer::build_parquet_writer_layer,
     },
     rotating_file_writer::RotatingFileWriter,
@@ -616,6 +618,7 @@ impl FsTraceConfig {
         };
 
         // Create OTLP layer - if enabled and endpoint is set via env vars
+        #[cfg(not(target_arch = "wasm32"))]
         if self.export_to_otlp
             && let Some((otlp_layer, mut handles)) = build_otlp_layer(
                 OtlpResourceConfig::new(self.command_name, env!("CARGO_PKG_VERSION")),

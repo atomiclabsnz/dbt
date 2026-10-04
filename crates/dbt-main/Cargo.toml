@@ -89,3 +89,6 @@ ignored = ["dbt-fusion-workspace-hack"]
 [lib]
 doctest = false
 path = "src/lib.rs"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

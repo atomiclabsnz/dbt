@@ -39,3 +39,6 @@ uuid = { workspace = true }
 name = "dbt_login"
 path = "src/lib.rs"
 doctest = false
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

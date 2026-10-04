@@ -46,3 +46,6 @@ tokio = { workspace = true }
 name = "dbt_metadata"
 path = "src/lib.rs"
 doctest = false
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }

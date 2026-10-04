@@ -507,14 +507,15 @@ futures-lite = "2.0"
 futures-util = "0.3"
 once_cell = "1.18"
 parking_lot = { version = "0.12.3" }
+# ferrion-wasm: the wasm-safe feature set only. tokio refuses `fs`, `net`,
+# `process`, `rt-multi-thread` and `signal` on any wasm target (compile_error!), so every
+# member that depends on tokio re-adds them under a
+# `[target.'cfg(not(target_arch = "wasm32"))'.dependencies]` table. Native
+# builds see exactly the feature set they saw before.
 tokio = { version = "1.41.1", features = [
-  "fs",
   "io-util",
   "macros",
-  "net",
-  "process",
-  "rt-multi-thread",
-  "signal",
+  "rt",
   "sync",
   "time",
 ] }

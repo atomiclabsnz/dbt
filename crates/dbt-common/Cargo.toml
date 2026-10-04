@@ -48,7 +48,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 
 arc-swap = { workspace = true }
-tokio = { workspace = true, features = ["fs"] }
+tokio = { workspace = true }
 
 normalize-path = { workspace = true }
 pathdiff = { workspace = true }
@@ -84,3 +84,16 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 name = "dbt_common"
 path = "src/mod.rs"
 doctest = false
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }
+
+# ferrion-wasm: the browser has no OS entropy source. Every getrandom major in
+# the graph needs its JS backend selected (0.3/0.4 also need
+# `--cfg getrandom_backend="wasm_js"` in RUSTFLAGS). These deps exist only to
+# turn the feature on; dbt-common does not call them.
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+uuid = { workspace = true, features = ["js"] }

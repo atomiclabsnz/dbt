@@ -7,6 +7,7 @@ use dbt_common::tracing::span_info::{SpanStatusRecorder as _, update_span_attrs}
 use dbt_common::{FsResult, create_info_span, stdfs, tokiofs};
 use dbt_telemetry::{DepsPackageInstalled, PackageType};
 use tracing::Instrument as _;
+#[cfg(not(target_arch = "wasm32"))]
 use vortex_events::package_install_event;
 
 use crate::context::DepsOperationContext;
@@ -69,6 +70,7 @@ pub(crate) trait PackageInstaller {
 
         let result = inner.record_status(&span);
 
+        #[cfg(not(target_arch = "wasm32"))]
         if result.is_ok() && ctx.io.send_anonymous_usage_stats {
             package_install_event(
                 ctx.io.invocation_id.to_string(),

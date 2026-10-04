@@ -21,7 +21,6 @@ dbt-fusion-workspace-hack = { version = "0.1" }
 dbt-yaml = { workspace = true }
 erased-serde = { workspace = true }
 opentelemetry = { workspace = true }
-opentelemetry-otlp = { workspace = true }
 opentelemetry-semantic-conventions = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 parquet = { workspace = true }
@@ -58,3 +57,10 @@ test-utils = ["fake"]
 name = "dbt_tracing"
 path = "src/lib.rs"
 doctest = false
+
+# ferrion-wasm: the OTLP exporter's HTTP client future is not `Send` on wasm
+# (opentelemetry-http over js_sys) and there is no endpoint to export to from a
+# browser tab. The span/log serialisation to OTLP protos stays.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+opentelemetry-otlp = { workspace = true }
+tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }
