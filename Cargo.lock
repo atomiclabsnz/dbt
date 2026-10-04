@@ -4053,6 +4053,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "dbt-vfs"
+version = "2.0.0-beta.2"
+dependencies = [
+ "tokio",
+ "walkdir",
+]
+
+[[package]]
 name = "dbt-vortex"
 version = "2.0.0-beta.2"
 dependencies = [

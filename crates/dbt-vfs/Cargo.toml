@@ -1,0 +1,32 @@
+[package]
+name = "dbt-vfs"
+version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+keywords.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+# ferrion-wasm: the seam every project read/write in dbt goes through.
+#
+# Native without `memory`: `dbt_vfs::fs` IS `std::fs`, `dbt_vfs::walkdir` IS
+# `walkdir`, `dbt_vfs::tokio_fs` IS `tokio::fs` — zero behaviour change.
+# On wasm32 (any OS), or natively with `memory`: an in-memory filesystem behind
+# `dbt_vfs::Backend`, which a host may replace with `dbt_vfs::install`.
+[features]
+memory = []
+
+[dependencies]
+tokio = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["fs"] }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

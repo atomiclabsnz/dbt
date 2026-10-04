@@ -13,6 +13,7 @@ members = [
   "crates/dbt-docs-server",
   "crates/dbt-adapter-core",
   "crates/dbt-common",
+  "crates/dbt-vfs",
   "crates/dbt-compilation",
   "crates/dbt-csv",
   "crates/dbt-pretty-table",
@@ -237,6 +238,7 @@ dbt-classification-types = { path = "crates/dbt-classification-types" }
 dbt-cloud-api = { path = "crates/dbt-cloud-api" }
 dbt-cloud-config = { path = "crates/dbt-cloud-config" }
 dbt-common = { path = "crates/dbt-common" }
+dbt-vfs = { path = "crates/dbt-vfs" }
 dbt-compilation = { path = "crates/dbt-compilation" }
 dbt-csv = { path = "crates/dbt-csv" }
 dbt-dag = { path = "crates/dbt-dag" }
