@@ -135,6 +135,10 @@ impl OpenOptions {
         self.0.create_new(v);
         self
     }
+    /// Unix permission bits: the VFS has none, so a no-op.
+    pub fn mode(&mut self, _mode: u32) -> &mut Self {
+        self
+    }
     pub async fn open(&self, path: impl AsRef<Path>) -> io::Result<File> {
         self.0.open(path).map(File::from_std)
     }

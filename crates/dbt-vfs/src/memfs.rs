@@ -440,3 +440,37 @@ pub fn set_permissions<P: AsRef<Path>>(path: P, _perm: Permissions) -> io::Resul
 pub fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) -> io::Result<()> {
     copy(original, link).map(|_| ())
 }
+
+// ---------------------------------------------------------------------------
+// parquet: what `std::fs::File` gets from the parquet crate
+
+#[cfg(feature = "parquet")]
+impl parquet::file::reader::Length for File {
+    fn len(&self) -> u64 {
+        self.metadata().map(|m| m.len()).unwrap_or(0)
+    }
+}
+
+#[cfg(feature = "parquet")]
+impl parquet::file::reader::ChunkReader for File {
+    type T = io::BufReader<File>;
+
+    fn get_read(&self, start: u64) -> parquet::errors::Result<Self::T> {
+        let mut f = self.try_clone()?;
+        f.seek(SeekFrom::Start(start))?;
+        Ok(io::BufReader::new(f))
+    }
+
+    fn get_bytes(&self, start: u64, length: usize) -> parquet::errors::Result<bytes::Bytes> {
+        let mut buffer = Vec::with_capacity(length);
+        let mut reader = self.try_clone()?;
+        reader.seek(SeekFrom::Start(start))?;
+        let read = reader.take(length as u64).read_to_end(&mut buffer)?;
+        if read != length {
+            return Err(parquet::errors::ParquetError::EOF(format!(
+                "Expected to read {length} bytes, read only {read}"
+            )));
+        }
+        Ok(buffer.into())
+    }
+}

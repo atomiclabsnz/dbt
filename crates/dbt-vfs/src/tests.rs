@@ -97,7 +97,11 @@ fn file_handle_read_write_seek_append() {
     assert_eq!(fs::read(&p).unwrap(), b"01a");
     assert_eq!(w.metadata().unwrap().len(), 3);
     // two handles share the bytes
-    let mut a = fs::OpenOptions::new().read(true).write(true).open(&p).unwrap();
+    let mut a = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&p)
+        .unwrap();
     let mut b = a.try_clone().unwrap();
     a.seek(SeekFrom::End(0)).unwrap();
     a.write_all(b"X").unwrap();
@@ -116,7 +120,12 @@ fn open_options_follow_std() {
         io::ErrorKind::InvalidInput
     );
     assert_eq!(
-        fs::OpenOptions::new().read(true).create(true).open(&p).unwrap_err().kind(),
+        fs::OpenOptions::new()
+            .read(true)
+            .create(true)
+            .open(&p)
+            .unwrap_err()
+            .kind(),
         io::ErrorKind::InvalidInput
     );
     fs::File::create_new(&p).unwrap();
@@ -202,7 +211,9 @@ fn rename_files_and_directories() {
     assert_eq!(fs::read(r.join("d2/x/f")).unwrap(), b"F");
     assert!(!fs::exists(r.join("d1")).unwrap());
     assert_eq!(
-        fs::rename(r.join("d2"), r.join("d2/x/inner")).unwrap_err().kind(),
+        fs::rename(r.join("d2"), r.join("d2/x/inner"))
+            .unwrap_err()
+            .kind(),
         io::ErrorKind::InvalidInput
     );
     fs::create_dir(r.join("d3")).unwrap();
@@ -226,10 +237,7 @@ fn copy_and_mtime_is_a_counter() {
     let t2 = fs::metadata(r.join("b")).unwrap().modified().unwrap();
     assert!(t2 > t1, "every mutation moves the clock");
     // a counter, not the wall clock: before 2100-01-01
-    let secs = t2
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let secs = t2.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
     assert!((1_577_836_800..4_102_444_800).contains(&secs));
     // reading does not touch
     fs::read(r.join("b")).unwrap();
@@ -277,7 +285,13 @@ fn implicit_directories() {
 #[test]
 fn walk_pre_order_depths_and_filter() {
     let r = root("walk");
-    for f in ["b/x.sql", "b/y.sql", "a/deep/z.sql", "top.yml", "ignored/w.sql"] {
+    for f in [
+        "b/x.sql",
+        "b/y.sql",
+        "a/deep/z.sql",
+        "top.yml",
+        "ignored/w.sql",
+    ] {
         let p = r.join(f);
         fs::create_dir_all(p.parent().unwrap()).unwrap();
         fs::write(p, b"").unwrap();
@@ -319,10 +333,7 @@ fn walk_pre_order_depths_and_filter() {
     // a missing root is one error
     let mut it = WalkDir::new(r.join("none")).into_iter();
     let err = it.next().unwrap().unwrap_err();
-    assert_eq!(
-        io::Error::from(err).kind(),
-        io::ErrorKind::NotFound
-    );
+    assert_eq!(io::Error::from(err).kind(), io::ErrorKind::NotFound);
     assert!(it.next().is_none());
 }
 
@@ -330,7 +341,9 @@ fn walk_pre_order_depths_and_filter() {
 fn tokio_shim_round_trip() {
     use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
     let r = root("tokio");
-    let rt = tokio::runtime::Builder::new_current_thread().build().unwrap();
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
     rt.block_on(async {
         crate::memtokio::create_dir_all(r.join("d")).await.unwrap();
         let mut f = crate::memtokio::File::create(r.join("d/f")).await.unwrap();
@@ -372,7 +385,10 @@ fn mount_and_snapshot() {
         .into_iter()
         .map(|(p, _)| p.to_string_lossy().into_owned())
         .collect();
-    assert_eq!(snap, ["dbt_project.yml", "models/a.sql", "target/manifest.json"]);
+    assert_eq!(
+        snap,
+        ["dbt_project.yml", "models/a.sql", "target/manifest.json"]
+    );
     // and nothing reached the real disk
     assert!(!Path::new("/dbt-vfs-test").exists());
 }

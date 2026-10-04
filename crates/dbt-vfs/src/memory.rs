@@ -285,7 +285,9 @@ impl Backend for MemoryBackend {
     fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
         let mut tree = lock(&self.tree);
         if from == to {
-            return Self::kind(&tree, from).map(|_| ()).ok_or_else(|| not_found(from));
+            return Self::kind(&tree, from)
+                .map(|_| ())
+                .ok_or_else(|| not_found(from));
         }
         match Self::kind(&tree, from) {
             None => Err(not_found(from)),
