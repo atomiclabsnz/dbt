@@ -29,6 +29,11 @@ bytes = { workspace = true, optional = true }
 parquet = { workspace = true, optional = true }
 tokio = { workspace = true }
 
+# `time`: std has no clock on wasm32-unknown-unknown (web-time re-exports std
+# on wasip1).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-time = { workspace = true }
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["fs"] }
 walkdir = { workspace = true }

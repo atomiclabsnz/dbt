@@ -2581,6 +2581,7 @@ dependencies = [
  "dbt-base",
  "dbt-fusion-workspace-hack",
  "dbt-pretty-table",
+ "dbt-vfs",
  "dialoguer 0.11.0",
  "dirs",
  "futures",
@@ -2951,6 +2952,7 @@ version = "2.0.0-beta.2"
 dependencies = [
  "dbt-common",
  "dbt-fusion-workspace-hack",
+ "dbt-vfs",
  "dbt-yaml",
  "libc",
  "serde",
@@ -2980,6 +2982,7 @@ dependencies = [
  "dbt-docs-core",
  "dbt-fusion-workspace-hack",
  "dbt-index-core",
+ "dbt-vfs",
  "http 1.5.0",
  "mime_guess",
  "rust-embed",
@@ -3059,6 +3062,7 @@ dependencies = [
  "dbt-schemas",
  "dbt-tasks-core",
  "dbt-tasks-sa",
+ "dbt-vfs",
  "minijinja",
  "serde",
  "serde_json",
@@ -3388,6 +3392,7 @@ dependencies = [
  "dbt-platform-auth",
  "dbt-schemas",
  "dbt-state",
+ "dbt-vfs",
  "dbt-yaml",
  "dialoguer 0.12.0",
  "dirs",
@@ -3574,6 +3579,7 @@ dependencies = [
  "base64 0.22.1",
  "dbt-fusion-workspace-hack",
  "dbt-schemas",
+ "dbt-vfs",
  "dbt-yaml",
  "dirs",
  "open",
@@ -3861,6 +3867,7 @@ dependencies = [
  "dbt-telemetry",
  "dbt-test-primitives",
  "dbt-tracing",
+ "dbt-vfs",
  "dbt-yaml",
  "futures",
  "humantime",
@@ -4069,6 +4076,7 @@ dependencies = [
  "console 0.16.4",
  "counter",
  "dbt-fusion-workspace-hack",
+ "dbt-vfs",
  "indicatif",
  "itertools 0.14.0",
  "scc",
@@ -4083,6 +4091,7 @@ dependencies = [
  "parquet",
  "tokio",
  "walkdir",
+ "web-time",
 ]
 
 [[package]]
@@ -10050,6 +10059,7 @@ name = "vortex-client"
 version = "2.0.0-beta.2"
 dependencies = [
  "dbt-fusion-workspace-hack",
+ "dbt-vfs",
  "http 1.5.0",
  "pbjson-types",
  "prost 0.14.4",

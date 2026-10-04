@@ -1,4 +1,6 @@
-//! ferrion-wasm: the filesystem seam for dbt.
+//! ferrion-wasm: the filesystem seam for dbt, and the two other host seams a
+//! wasm32 build needs on dbt's run path: [`time`] (no clock in std) and
+//! [`thread`] (no threads, no blocking).
 //!
 //! On `wasm32-unknown-unknown` every `std::fs` call returns `Unsupported`, so
 //! every project read and write in dbt's run path goes through this crate
@@ -40,6 +42,14 @@ pub use memory::{Backend, FileHandle, MemoryBackend, backend, install};
 
 /// `true` when [`fs`] is the in-memory filesystem rather than `std::fs`.
 pub const IN_MEMORY: bool = cfg!(vfs_memory);
+
+/// The clock and timer seam (`std`/`tokio::time` natively, `web-time` and
+/// no-wait timers on wasm32). See the module docs.
+pub mod time;
+
+/// The thread seam (`std::thread`/`spawn_blocking` natively, single-threaded
+/// stand-ins on wasm32). See the module docs.
+pub mod thread;
 
 /// A `std::fs`-shaped API. Natively without the `memory` feature this is
 /// literally `std::fs`.
