@@ -11,15 +11,44 @@ use serde::{
 use crate::{
     error,
     value::{
-        de::{
-            borrowed::ValueRefDeserializer, reset_is_deserializing_value, save_deserializer_state,
-        },
+        de::{reset_is_deserializing_value, save_deserializer_state},
         tagged,
     },
     Error, Mapping, Path, Sequence, Value,
 };
 
 use super::{FieldTransformer, UnusedKeyCallback};
+
+// "Ref mode": upstream deserializes a `ShouldBe<T>` from a `Value` through the
+// borrowed `ValueRefDeserializer` (so the raw value survives for `why_not`),
+// which monomorphises that whole second deserializer for every type reachable
+// under a `ShouldBe`. Here the owned deserializer handles it on a clone of the
+// value instead, and this flag makes it reproduce the borrowed deserializer's
+// observable behaviour for the dynamic extent of that call (the few places the
+// two differ are marked `ref mode`). Upstream's borrowed deserializer hands a
+// value the field transformer replaced back to the owned one, so a transformed
+// value leaves ref mode for its own extent.
+thread_local! {
+    static REF_MODE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[must_use]
+pub(crate) struct RefModeGuard(bool);
+
+impl Drop for RefModeGuard {
+    fn drop(&mut self) {
+        let prev = self.0;
+        REF_MODE.with(|m| m.set(prev));
+    }
+}
+
+pub(crate) fn set_ref_mode(on: bool) -> RefModeGuard {
+    RefModeGuard(REF_MODE.with(|m| m.replace(on)))
+}
+
+pub(crate) fn ref_mode() -> bool {
+    REF_MODE.with(|m| m.get())
+}
 
 fn visit_sequence<'de, 'a, 'u, 'f, V>(
     sequence: Sequence,
@@ -383,28 +412,40 @@ impl<'a, 'u, 'f> ValueDeserializer<'a, 'u, 'f> {
 
     fn maybe_apply_transformation(
         &mut self,
-    ) -> Result<(), Box<dyn std::error::Error + 'static + Send + Sync>> {
+    ) -> Result<Option<RefModeGuard>, Box<dyn std::error::Error + 'static + Send + Sync>> {
+        let mut mode = None;
         if let Some(transformer) = &mut self.field_transformer {
             if !self.is_transformed && crate::verbatim::should_transform_any() {
                 if let Some(v) = transformer(&self.value)? {
                     self.value = v;
+                    if ref_mode() {
+                        // ref mode: the borrowed deserializer forwards a transformed
+                        // value to the owned one.
+                        mode = Some(set_ref_mode(false));
+                    }
                 }
                 self.is_transformed = true;
             }
         }
-        Ok(())
+        Ok(mode)
     }
 }
 
 macro_rules! maybe_expecting_should_be {
     ($self:expr, $method:ident, $($args:expr),*) => {{
         if $crate::shouldbe::is_expecting_should_be_then_reset() {
+            // Deserialize a clone through THIS (owned) deserializer and keep the
+            // original for `why_not`. Upstream routes this through
+            // `ValueRefDeserializer`, which monomorphises the borrowed
+            // deserializer for every type reachable under a `ShouldBe<T>`, on
+            // top of the owned one (dbt-fusion wasm size: see the `yaml-size`
+            // branch notes).
             let res = $self.maybe_apply_transformation().map_err(|e| e.into())
-                .and_then(|_| {
-                    ValueRefDeserializer::new_with_transformed(
-                        // SAFETY: ShouldBe<T>::Deserialize is only implemented for T:DeserializeOwned,
-                        // so we know that `res` can not contain references to `self.value`.
-                        unsafe { std::mem::transmute::<&Value, &'de Value>(&$self.value) },
+                .and_then(|_transformed| {
+                    // Upstream deserializes even a transformed value by reference here.
+                    let _ref_mode = set_ref_mode(true);
+                    ValueDeserializer::new_with_transformed(
+                        $self.value.clone(),
                         $self.path,
                         $self.unused_key_callback,
                         $self.field_transformer,
@@ -448,7 +489,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
             return Err(Error::custom("Value deserialized via fast path"));
         }
         maybe_expecting_should_be!(self, deserialize_any, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
 
         match self.value {
             Value::Null(..) => visitor.visit_unit(),
@@ -479,7 +520,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_bool, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
 
         let span = self.value.span().clone();
         self.value.broadcast_end_mark();
@@ -495,7 +536,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_i8, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -504,7 +545,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_i16, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -513,7 +554,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_i32, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -522,7 +563,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_i64, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -531,7 +572,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_i128, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -540,7 +581,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_u8, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -549,7 +590,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_u16, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -558,7 +599,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_u32, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -567,7 +608,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_u64, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -576,7 +617,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_u128, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -585,7 +626,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_f32, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -594,7 +635,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_f64, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
         self.value.deserialize_number(visitor)
     }
 
@@ -617,7 +658,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_string, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
 
         let span = self.value.span().clone();
         self.value.broadcast_end_mark();
@@ -640,7 +681,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_byte_buf, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
 
         let span = self.value.span().clone();
         self.value.broadcast_end_mark();
@@ -663,7 +704,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_option, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
 
         let span = self.value.span().clone();
         match self.value {
@@ -684,7 +725,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_unit, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
 
         let span = self.value.span().clone();
         self.value.broadcast_end_mark();
@@ -711,7 +752,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_newtype_struct, name, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
 
         let span = self.value.span().clone();
         let path = self.path;
@@ -726,7 +767,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_seq, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
 
         let span = self.value.span().clone();
         self.value.broadcast_end_mark();
@@ -774,7 +815,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_map, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
 
         let span = self.value.span().clone();
         self.value.broadcast_end_mark();
@@ -808,7 +849,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_struct, name, fields, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
 
         let span = self.value.span().clone();
         self.value.broadcast_end_mark();
@@ -821,6 +862,14 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
                 self.unused_key_callback,
                 self.field_transformer,
             ),
+            // ref mode: the borrowed deserializer visits an empty map (no
+            // flatten keys) instead of an empty struct.
+            Value::Null(..) if ref_mode() => visitor.visit_map(&mut MapDeserializer::new(
+                Mapping::new(),
+                self.path,
+                None,
+                None,
+            )),
             Value::Null(..) => visit_struct(
                 Mapping::new(),
                 self.path,
@@ -844,7 +893,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
         V: Visitor<'de>,
     {
         maybe_expecting_should_be!(self, deserialize_enum, name, variants, visitor);
-        self.maybe_apply_transformation()?;
+        let _mode = self.maybe_apply_transformation()?;
 
         let span = self.value.span().clone();
         self.value.broadcast_end_mark();
@@ -873,10 +922,13 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
                     field_transformer: self.field_transformer,
                 },
                 other => {
-                    return Err(Error::invalid_type(
-                        other.unexpected(),
-                        &"a Value::Tagged enum",
-                    ));
+                    let err = Error::invalid_type(other.unexpected(), &"a Value::Tagged enum");
+                    // ref mode: the borrowed deserializer locates this error.
+                    return Err(if ref_mode() {
+                        error::set_span(err, span, self.path)
+                    } else {
+                        err
+                    });
                 }
             })
             .map_err(|e| error::set_span(e, span, self.path))
@@ -1272,6 +1324,37 @@ impl<'de, 'u, 'f> MapAccess<'de> for MapDeserializer<'_, 'u, 'f> {
 impl<'de, 'u, 'f> Deserializer<'de> for MapDeserializer<'_, 'u, 'f> {
     type Error = Error;
 
+    fn deserialize_struct<V>(
+        self,
+        _name: &'static str,
+        fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Error>
+    where
+        V: Visitor<'de>,
+    {
+        if !ref_mode() {
+            return self.deserialize_any(visitor);
+        }
+        // ref mode: as the borrowed map deserializer does.
+        let (normal_keys, flatten_keys): (Vec<_>, Vec<_>) = fields
+            .iter()
+            .copied()
+            .partition(|key| !crate::is_flatten_key(key.as_bytes()));
+        visitor.visit_map(StructDeserializer {
+            iter: self.iter,
+            current_key: None,
+            path: self.path,
+            value: None,
+            normal_keys: normal_keys.into_iter().collect(),
+            flatten_keys,
+            unused_key_callback: self.unused_key_callback,
+            field_transformer: self.field_transformer,
+            rest: Vec::new(),
+            flatten_keys_done: 0,
+        })
+    }
+
     #[inline]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Error>
     where
@@ -1306,7 +1389,7 @@ impl<'de, 'u, 'f> Deserializer<'de> for MapDeserializer<'_, 'u, 'f> {
     forward_to_deserialize_any! {
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes
         byte_buf option unit unit_struct newtype_struct seq tuple tuple_struct
-        map struct enum identifier
+        map enum identifier
     }
 }
 
@@ -1446,6 +1529,20 @@ impl<'de> MapAccess<'de> for StructDeserializer<'_, '_, '_> {
                             .map(|cb| &mut *cb as FieldTransformer<'_>),
                     );
                     seed.deserialize(deserializer)
+                } else if ref_mode() {
+                    // ref mode: the borrowed deserializer hands the last flatten field
+                    // a map deserializer over the remaining entries, not a `Value`.
+                    let deserializer = MapDeserializer::new(
+                        self.rest.drain(..).collect(),
+                        path,
+                        self.unused_key_callback
+                            .as_deref_mut()
+                            .map(|cb| &mut *cb as UnusedKeyCallback<'_>),
+                        self.field_transformer
+                            .as_deref_mut()
+                            .map(|cb| &mut *cb as FieldTransformer<'_>),
+                    );
+                    seed.deserialize(deserializer)
                 } else {
                     let deserializer = ValueDeserializer::new_with(
                         Value::mapping(self.rest.drain(..).collect()),
@@ -1541,7 +1638,12 @@ impl<'de, 'r, 'f> Deserializer<'de> for FlattenDeserializer<'_, 'r, 'f> {
                 save_deserializer_state(
                     Some(value),
                     self.path,
-                    Some(&mut collect_unused as UnusedKeyCallback<'_>),
+                    // ref mode: the borrowed deserializer drops the collector here.
+                    if ref_mode() {
+                        None
+                    } else {
+                        Some(&mut collect_unused as UnusedKeyCallback<'_>)
+                    },
                     self.field_transformer,
                 );
             }
