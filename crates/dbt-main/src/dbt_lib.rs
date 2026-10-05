@@ -66,11 +66,10 @@ use dbt_loader::{
 };
 use dbt_login::{execute_login, execute_login_status};
 use dbt_schema_store::{DataStoreTrait, SchemaStoreTrait};
+#[cfg(not(target_arch = "wasm32"))]
+use dbt_schemas::man::execute_man_command;
 use dbt_schemas::schemas::DbtCommandExecutionArtifacts;
-use dbt_schemas::{
-    man::execute_man_command,
-    schemas::legacy_catalog::{DbtCatalog, build_catalog},
-};
+use dbt_schemas::schemas::legacy_catalog::{DbtCatalog, build_catalog};
 use dbt_schemas::{
     schemas::{
         DbtModel, InternalDbtNodeAttributes,
@@ -402,7 +401,16 @@ async fn do_execute_fs(
     }
 
     if let Command::Core(Man(_)) = &cli.command {
+        // ferrion-wasm: `dbt man` prints the JSON Schemas, and is the only thing
+        // that keeps every schema type's JsonSchema impl (schemars) in the
+        // module. Not offered on wasm32.
+        #[cfg(not(target_arch = "wasm32"))]
         return execute_man_command(eval_arg).await;
+        #[cfg(target_arch = "wasm32")]
+        return Err(fs_err!(
+            ErrorCode::InvalidArgument,
+            "`dbt man` is not available in this (wasm32) build"
+        ));
     } else if let Command::Core(Internal(internal_args)) = &cli.command {
         return match &internal_args.command {
             InternalCommand::GetDistributionInfo(args) => execute_get_distribution_info(
