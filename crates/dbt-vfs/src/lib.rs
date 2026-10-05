@@ -1,6 +1,6 @@
-//! ferrion-wasm: the filesystem seam for dbt, and the two other host seams a
-//! wasm32 build needs on dbt's run path: [`time`] (no clock in std) and
-//! [`thread`] (no threads, no blocking).
+//! ferrion-wasm: the filesystem seam for dbt, and the other host seams a
+//! wasm32 build needs on dbt's run path: [`time`] (no clock in std),
+//! [`thread`] (no threads, no blocking) and [`env`] (no process environment).
 //!
 //! On `wasm32-unknown-unknown` every `std::fs` call returns `Unsupported`, so
 //! every project read and write in dbt's run path goes through this crate
@@ -51,6 +51,10 @@ pub mod time;
 /// stand-ins on wasm32). See the module docs.
 pub mod thread;
 
+/// The process-environment seam (`std::env` natively, one in-memory
+/// environment on wasm32). See the module docs.
+pub mod env;
+
 /// A `std::fs`-shaped API. Natively without the `memory` feature this is
 /// literally `std::fs`.
 pub mod fs {
@@ -84,14 +88,14 @@ pub mod tokio_fs {
 
 /// Resolve `.` and `..` lexically and make `path` absolute, without the OS.
 ///
-/// A relative path is taken against the process's current directory when it
-/// has one (native), and `/` when it does not (wasm32-unknown-unknown).
+/// A relative path is taken against [`env::current_dir`] (the process's
+/// natively, the in-memory one on wasm32), or `/` if it has none.
 pub fn normalize(path: &Path) -> PathBuf {
     let base;
     let joined: &Path = if path.has_root() {
         path
     } else {
-        base = std::env::current_dir()
+        base = env::current_dir()
             .unwrap_or_else(|_| PathBuf::from("/"))
             .join(path);
         &base

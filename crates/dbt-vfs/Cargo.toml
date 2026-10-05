@@ -35,6 +35,8 @@ tokio = { workspace = true }
 web-time = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# `env::home_dir` is `dirs::home_dir` natively.
+dirs = { workspace = true }
 tokio = { workspace = true, features = ["fs"] }
 walkdir = { workspace = true }
 

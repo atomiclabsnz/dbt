@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""ferrion-wasm: route dbt's run-path clock, timer, sleep and thread calls
-through `dbt_vfs::time` / `dbt_vfs::thread`.
+"""ferrion-wasm: route dbt's run-path clock, timer, sleep, thread and process
+environment calls through `dbt_vfs::time` / `dbt_vfs::thread` / `dbt_vfs::env`.
 
 On wasm32-unknown-unknown these compile and then PANIC at runtime (no clock,
-no threads, no blocking pool, and tokio's timer driver reads std's clock).
-`dbt_vfs::time` / `dbt_vfs::thread` are std/tokio natively and single-threaded
-stand-ins on wasm32 (see their module docs), so natively nothing changes.
+no threads, no blocking pool, tokio's timer driver reads std's clock, and
+`env::vars`/`set_var`/`temp_dir` panic for want of a process environment).
+`dbt_vfs::time` / `dbt_vfs::thread` / `dbt_vfs::env` are std/tokio natively and
+single-threaded / in-memory stand-ins on wasm32 (see their module docs), so
+natively nothing changes.
 
     python3 scripts/wasm-runtime-rewrite.py            # rewrite in place
     python3 scripts/wasm-runtime-rewrite.py --check    # exit 1 if a rewrite is pending
@@ -32,6 +34,13 @@ Rewrites:
   [std::]thread::sleep(                  -> dbt_vfs::thread::sleep(
   [tokio::]task::spawn_blocking(         -> dbt_vfs::thread::spawn_blocking(
   std::thread::scope(                    -> dbt_vfs::thread::scope(
+  use std::env[::..]  (also nested)      -> use dbt_vfs::env[::..]   (every std::env
+                                            leaf moves: dbt_vfs::env re-exports
+                                            std::env and shadows what wasm lacks)
+  std::env::X                            -> dbt_vfs::env::X
+  std::process::id()                     -> dbt_vfs::env::process_id()
+  dirs::home_dir()                       -> dbt_vfs::env::home_dir()  (None on wasm,
+                                            and dbt .expect()s it for leases)
 
 then drops `SystemTime` / `thread` import leaves the rewrite orphaned, applies
 the literal PATCHES below, and adds the dbt-vfs dependency.
@@ -339,6 +348,46 @@ def rewrite_uses(src: str, mask, skip, stats: Counter) -> str:
     return "".join(out)
 
 
+STD_ENV = (["std", "env"], ["", "std", "env"])
+
+
+def is_std_env_leaf(segs) -> bool:
+    return any(segs[: len(p)] == p for p in STD_ENV)
+
+
+def rewrite_env_uses(src: str, mask, skip, stats: Counter) -> str:
+    """Every `std::env` leaf of a `use` moves to `dbt_vfs::env` (which
+    re-exports all of std::env), the other leaves stay where they are."""
+    out = []
+    last = 0
+    for m in USE_STMT.finditer(src):
+        if not mask[m.start()] or skip(m.start()):
+            continue
+        try:
+            leaves = parse_use_tree(m.group(2))
+        except ValueError:
+            continue
+        if not any(is_std_env_leaf(segs) for segs, _ in leaves):
+            continue
+
+        def mv(segs):
+            k = 3 if segs[0] == "" else 2
+            return ["dbt_vfs", "env"] + segs[k:]
+
+        moved = [(mv(segs), a) for segs, a in leaves if is_std_env_leaf(segs)]
+        kept = [(segs, a) for segs, a in leaves if not is_std_env_leaf(segs)]
+        vis = m.group(1) or ""
+        indent = src[src.rfind("\n", 0, m.start()) + 1 : m.start()]
+        stmts = ([kept] if kept else []) + [moved]
+        text = ("\n" + indent).join(f"{vis}use {render_leaves(ls)};" for ls in stmts)
+        out.append(src[last : m.start()])
+        out.append(text)
+        last = m.end()
+        stats["use std::env"] += 1
+    out.append(src[last:])
+    return "".join(out)
+
+
 def prune_orphans(src: str, mask, skip, stats: Counter) -> str:
     """Drop `SystemTime` / `thread` leaves no other code in the file names."""
     uses = [m for m in USE_STMT.finditer(src) if mask[m.start()]]
@@ -413,6 +462,9 @@ CALL_SUBS = [
     ("thread::sleep", re.compile(r"(?<![\w:])(?:(?:::)?std::)?thread::sleep\("), "dbt_vfs::thread::sleep("),
     ("spawn_blocking", re.compile(r"(?<![\w:])(?:tokio::)?task::spawn_blocking\("), "dbt_vfs::thread::spawn_blocking("),
     ("thread::scope", re.compile(r"(?<![\w:])(?:::)?std::thread::scope\("), "dbt_vfs::thread::scope("),
+    ("std::env", re.compile(r"(?<![\w:])(?:::)?std::env::(?=[A-Za-z_])"), "dbt_vfs::env::"),
+    ("process::id", re.compile(r"(?<![\w:])(?:::)?std::process::id\(\)"), "dbt_vfs::env::process_id()"),
+    ("dirs::home_dir", re.compile(r"(?<![\w:])(?:::)?dirs::home_dir\(\)"), "dbt_vfs::env::home_dir()"),
 ]
 
 
@@ -426,6 +478,10 @@ def rewrite_file(path: Path, rel: str, stats: Counter) -> bool:
         return lambda pos: any(a <= pos < b for a, b in regions_) or any(a <= pos < b for a, b in gated_)
 
     text = rewrite_uses(src, mask, skip_at(src, regions, gated), stats)
+    mask = vfs.code_mask(text)
+    text = rewrite_env_uses(
+        text, mask, skip_at(text, vfs.test_regions(text, mask), scan.gated_spans(text, mask)), stats
+    )
     # recompute spans on the new text
     mask = vfs.code_mask(text)
     skip = skip_at(text, vfs.test_regions(text, mask), scan.gated_spans(text, mask))

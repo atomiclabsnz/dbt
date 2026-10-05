@@ -15,6 +15,12 @@ On wasm32-unknown-unknown, std has no clock, no threads and no blocking:
   thread::sleep / thread::park     panic, or block the only thread forever
   spawn_blocking / block_in_place  tokio cannot start its blocking pool
   tokio::time                      the timer driver reads std Instant
+  env::vars / vars_os / temp_dir   panic ("not supported on this platform")
+  env::set_var / remove_var        panic (the platform setter returns Err)
+  env::current_dir                 an Err (no cwd), which dbt may `.expect()`
+  process::exit / abort            unwind into a trap, taking the host with it
+  process::id                      panic ("no pids on this platform")
+  dirs::home_dir                   None, which dbt `.expect()`s for its leases
 
 The fix is a seam, not a rewrite: time goes through `dbt_vfs::time` (std
 natively, `web-time` and no-wait timers on wasm) and threads, sleeps and the
@@ -60,6 +66,13 @@ KINDS = [
     ("spawn_blocking", re.compile(r"\bspawn_blocking\b")),
     ("block_in_place", re.compile(r"\bblock_in_place\b")),
     ("tokio::time", re.compile(r"\btokio::time\b")),
+    ("env::vars", re.compile(r"\benv::vars(?:_os)?\s*\(")),
+    ("env::set_var", re.compile(r"\benv::(?:set_var|remove_var)\s*\(")),
+    ("env::temp_dir", re.compile(r"\benv::temp_dir\s*\(")),
+    ("env::current_dir", re.compile(r"\benv::(?:current_dir|set_current_dir)\s*\(")),
+    ("process::exit", re.compile(r"\bprocess::(?:exit|abort)\s*\(")),
+    ("process::id", re.compile(r"\bprocess::id\s*\(")),
+    ("home_dir", re.compile(r"\b(?:dirs|env)::home_dir\s*\(")),
 ]
 
 # A cfg attribute (outer or inner) whose predicate excludes wasm32.
@@ -90,6 +103,36 @@ LEFTOVERS: list[tuple[str, str, str]] = [
         "dbt-dist/src/lib.rs",
         "thread::spawn",
         "PATH discovery for distribution info, not `dbt run`; no PATH on wasm, so it returns first",
+    ),
+    (
+        "dbt-main/src/main_impl.rs",
+        "process::exit",
+        "the CLI binary's entry (parse/exit codes); a wasm host calls dbt_lib::setup_and_execute_fs",
+    ),
+    (
+        "dbt-main/src/uninstall.rs",
+        "process::exit",
+        "`dbt uninstall`, not `dbt run`",
+    ),
+    (
+        "dbt-clap-core/src/lib.rs",
+        "process::exit",
+        "`--version --output json` from the binary's argv, before a host's parse",
+    ),
+    (
+        "dbt-common/src/source_lineage.rs",
+        "process::exit",
+        "interactive relaunch of the CLI as a subprocess; not on the run path",
+    ),
+    (
+        "dbt-adbc/src/bin/adbc_sync.rs",
+        "process::exit",
+        "a standalone dev binary",
+    ),
+    (
+        "dbt-adbc/src/bin/repl.rs",
+        "process::exit",
+        "a standalone dev binary",
     ),
 ]
 
@@ -260,11 +303,14 @@ SEAM_CRATE = "dbt-vfs"  # the seam itself: its wasm arms are the implementation
 
 SEAM_INSTANT = re.compile(r"\buse\s+dbt_vfs::time::(?:Instant\b|\{[^}]*\bInstant\b)")
 SEAM_THREAD_MOD = re.compile(r"\buse\s+dbt_vfs::thread(?:\s*;|::\{\s*self\b)")
+SEAM_ENV_MOD = re.compile(r"\buse\s+dbt_vfs::(?:env\s*;|\{[^}]*\benv\b)")
 
 
 def routed(src: str, pos: int, kind: str) -> bool:
     before = src[max(0, pos - 20) : pos]
     if before.endswith(("dbt_vfs::time::", "dbt_vfs::thread::", "dbt_vfs::")):
+        return True
+    if (kind.startswith("env::") or src.startswith("env::", pos)) and src[pos - 2 : pos] != "::" and SEAM_ENV_MOD.search(src):
         return True
     if kind == "Instant::now" and src[pos - 2 : pos] != "::" and SEAM_INSTANT.search(src):
         return True
