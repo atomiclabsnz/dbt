@@ -1,0 +1,39 @@
+[package]
+name = "dbt-yaml"
+version = "0.9.6"
+authors = ["Bo Lin <bo.lin@dbtlabs.com>", "David Tolnay <dtolnay@gmail.com>"]
+categories = ["encoding", "parser-implementations"]
+description = "YAML data format for Serde"
+documentation = "https://docs.rs/dbt-yaml/"
+edition = "2021"
+keywords = ["yaml", "serde", "serialization"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/sdf-labs/dbt-yaml"
+rust-version = "1.88"
+exclude = ["examples/", "tests/"]
+
+[dependencies]
+indexmap = "2.7.1"
+itoa = "1.0"
+ryu = "1.0"
+serde = "1.0.195"
+unsafe-libyaml = "0.2.11"
+
+schemars = {version = "0.8", optional = true}
+dbt-yaml_derive = { workspace = true }
+dbt-yaml_schemars_derive = { workspace = true, optional = true }
+
+[features]
+filename = []
+yaml_11 = []
+flatten_dunder = ["dbt-yaml_schemars_derive?/flatten_dunder"]
+schemars = ["dep:schemars", "dep:dbt-yaml_schemars_derive"]
+
+[dev-dependencies]
+anyhow = "1.0.79"
+indoc = "2.0"
+serde_derive = "1.0.195"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+rustdoc-args = ["--generate-link-to-definition"]

@@ -109,6 +109,14 @@ version = "2.0.0-beta.2"
 
 [patch.crates-io]
 
+# ============================= dbt-yaml (vendored) ================================
+# crates.io dbt-yaml 0.9.6, vendored verbatim in crates/dbt-yaml so that its
+# deserializers can be changed for code size on wasm32 (see the commits on the
+# `yaml-size` branch). Path-patched so every crate depending on
+# `dbt-yaml = "0.9.6"` gets this copy.
+dbt-yaml = { path = "crates/dbt-yaml" }
+# ==================================================================================
+
 # ============================= ring build.rs workaround ===========================
 #
 # ring 0.17.14 contains a rogue `build.rs` that forces a full rebuild of our

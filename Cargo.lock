@@ -4222,8 +4222,6 @@ dependencies = [
 [[package]]
 name = "dbt-yaml"
 version = "0.9.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "415dae836aa1570c78342f9a2ce369bf0a51dbb8664630f61408c4b61cd6fb71"
 dependencies = [
  "dbt-yaml_derive",
  "dbt-yaml_schemars_derive",

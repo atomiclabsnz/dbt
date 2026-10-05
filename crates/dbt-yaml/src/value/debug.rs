@@ -1,0 +1,39 @@
+use crate::mapping::Mapping;
+use crate::value::{Number, Value};
+use std::fmt::{self, Debug};
+
+impl Debug for Value {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        // TODO: print the span as well
+        match self {
+            Value::Null(..) => formatter.write_str("Null"),
+            Value::Bool(boolean, ..) => write!(formatter, "Bool({})", boolean),
+            Value::Number(number, ..) => write!(formatter, "Number({})", number),
+            Value::String(string, ..) => write!(formatter, "String({:?})", string),
+            Value::Sequence(sequence, ..) => {
+                formatter.write_str("Sequence ")?;
+                formatter.debug_list().entries(sequence).finish()
+            }
+            Value::Mapping(mapping, ..) => Debug::fmt(mapping, formatter),
+            Value::Tagged(tagged, ..) => Debug::fmt(tagged, formatter),
+        }?;
+        write!(formatter, " @{{{:?}}}", self.span())
+    }
+}
+
+impl Debug for Number {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "Number({})", self)
+    }
+}
+
+impl Debug for Mapping {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("Mapping ")?;
+        let mut debug = formatter.debug_map();
+        for (k, v) in self {
+            debug.entry(k, v);
+        }
+        debug.finish()
+    }
+}
