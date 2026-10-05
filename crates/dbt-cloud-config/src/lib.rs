@@ -23,11 +23,11 @@ pub const TEST_CLOUD_CONFIG_DIR_ENV: &str = "_TEST_CLOUD_CONFIG_DIR";
 /// Stripped from release binaries.
 pub fn get_cloud_project_path() -> Result<PathBuf, String> {
     #[cfg(debug_assertions)]
-    if let Some(dir) = std::env::var_os(TEST_CLOUD_CONFIG_DIR_ENV) {
+    if let Some(dir) = dbt_vfs::env::var_os(TEST_CLOUD_CONFIG_DIR_ENV) {
         return Ok(PathBuf::from(dir).join("dbt_cloud.yml"));
     }
 
-    dirs::home_dir()
+    dbt_vfs::env::home_dir()
         .map(|home| home.join(".dbt").join("dbt_cloud.yml"))
         .ok_or_else(|| "Could not determine home directory".to_string())
 }

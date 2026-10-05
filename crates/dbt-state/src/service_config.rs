@@ -1,5 +1,5 @@
+use dbt_vfs::env;
 use std::collections::HashMap;
-use std::env;
 use std::fmt;
 use std::time::Duration;
 

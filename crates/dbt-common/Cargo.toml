@@ -101,3 +101,8 @@ uuid = { workspace = true, features = ["js"] }
 # rustls (via ureq in vortex-client) reads the clock through pki-types, which
 # needs `web` (web-time) on wasm32-unknown-unknown.
 rustls-pki-types = { version = "1", features = ["web"] }
+# chrono's `Utc::now`/`Local::now` and time's `OffsetDateTime::now_utc` read
+# std's `SystemTime::now()` (a panic on wasm32-unknown-unknown) unless their JS
+# clock is selected. dbt stamps every node, run result and log with them.
+chrono = { workspace = true, features = ["wasmbind"] }
+time = { version = "0.3", features = ["wasm-bindgen"] }

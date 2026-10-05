@@ -46,7 +46,7 @@ impl<'a> DepsOperationContext<'a> {
         private_package_resolver: Arc<dyn PrivatePackageResolver>,
         cloud_config: Option<ResolvedCloudConfig>,
     ) -> Self {
-        let hub_url_from_env = std::env::var("DBT_PACKAGE_HUB_URL");
+        let hub_url_from_env = dbt_vfs::env::var("DBT_PACKAGE_HUB_URL");
         let hub_url = hub_url_from_env
             .as_deref()
             .map(|s| {

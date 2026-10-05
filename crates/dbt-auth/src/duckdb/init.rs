@@ -104,7 +104,7 @@ impl DuckDbPath {
                 (key == "motherduck_token" && !value.is_empty()).then(|| value.to_owned())
             })
         });
-        from_path.or_else(|| std::env::var("MOTHERDUCK_TOKEN").ok())
+        from_path.or_else(|| dbt_vfs::env::var("MOTHERDUCK_TOKEN").ok())
     }
 
     /// Derive a database name from a MotherDuck path.

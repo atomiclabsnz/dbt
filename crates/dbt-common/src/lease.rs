@@ -54,7 +54,7 @@ pub async fn acquire_lease(project_dir: &Path, relative_dir: &Path) -> FsResult<
 fn lease_file_path(project_root: &Path, dir_name: &Path) -> PathBuf {
     let dir_path = DbtPath::from(project_root.join(dir_name));
 
-    let home_dir = DbtPath::from(dirs::home_dir().expect("Unable to get home directory"));
+    let home_dir = DbtPath::from(dbt_vfs::env::home_dir().expect("Unable to get home directory"));
     debug_assert!(home_dir.is_absolute());
 
     let dbt_leases_dir = home_dir.join(".dbt/leases");

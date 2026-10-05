@@ -1,10 +1,11 @@
+use dbt_vfs::env;
 use std::ffi::OsString;
 use std::io::{Read as _, Write as _};
 use std::path::{Path, PathBuf};
 use std::result::Result;
 use std::sync::OnceLock;
 use std::time::Duration;
-use std::{env, fmt, io};
+use std::{fmt, io};
 
 use crate::driver::DriverFilenameDisplay;
 use crate::driver_channel::foundry_driver;

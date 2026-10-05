@@ -30,11 +30,11 @@ pub struct TelemetryParsingErrorFilter {
 
 impl TelemetryParsingErrorFilter {
     pub fn new(show_all_deprecations: bool) -> Self {
-        let beta_parsing = match std::env::var("DBT_ENGINE_BETA_PARSING") {
+        let beta_parsing = match dbt_vfs::env::var("DBT_ENGINE_BETA_PARSING") {
             Ok(val) => val == "1",
             Err(_) => false, // default to false (strict mode on)
         };
-        let beta_package_parsing = match std::env::var("DBT_ENGINE_BETA_PACKAGE_PARSING") {
+        let beta_package_parsing = match dbt_vfs::env::var("DBT_ENGINE_BETA_PACKAGE_PARSING") {
             Ok(val) => val == "1",
             Err(_) => true, // default to true (strict mode off for packages)
         };

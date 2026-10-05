@@ -1,4 +1,4 @@
-use std::env;
+use dbt_vfs::env;
 
 #[cfg(not(target_os = "windows"))]
 use run_script::ScriptOptions;

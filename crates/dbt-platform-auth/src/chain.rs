@@ -14,7 +14,7 @@ pub const OAUTH_CLIENT_ID: &str = "854ad54c885f03bbe6ca7eb1e75593fb";
 
 /// Returns the effective OAuth client ID, preferring `DBT_OAUTH_CLIENT_ID` if set.
 fn effective_client_id() -> String {
-    std::env::var("DBT_OAUTH_CLIENT_ID").unwrap_or_else(|_| OAUTH_CLIENT_ID.to_owned())
+    dbt_vfs::env::var("DBT_OAUTH_CLIENT_ID").unwrap_or_else(|_| OAUTH_CLIENT_ID.to_owned())
 }
 
 /// An ordered chain of credential resolvers tried in sequence.
@@ -122,7 +122,7 @@ impl AuthChainBuilder {
     }
 
     pub fn build(self) -> AuthChain {
-        let client_id = std::env::var("DBT_OAUTH_CLIENT_ID").unwrap_or(self.client_id);
+        let client_id = dbt_vfs::env::var("DBT_OAUTH_CLIENT_ID").unwrap_or(self.client_id);
         let mut resolvers = vec![
             AuthResolver::EnvVar(EnvVarResolver),
             AuthResolver::OAuthPassive(OAuthPassiveResolver::new(&client_id)),

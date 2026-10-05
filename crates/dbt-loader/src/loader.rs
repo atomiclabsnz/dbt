@@ -1128,7 +1128,7 @@ pub async fn load_inner(
 /// outputs the timestamp that this run started
 fn run_started_at() -> DateTime<Tz> {
     // check if we have env var DBT_RUN_STARTED_AT
-    if let Ok(run_started_at) = std::env::var("DBT_RUN_STARTED_AT") {
+    if let Ok(run_started_at) = dbt_vfs::env::var("DBT_RUN_STARTED_AT") {
         DateTime::parse_from_rfc3339(&run_started_at)
             .unwrap()
             .with_timezone(&Tz::UTC)

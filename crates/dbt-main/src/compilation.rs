@@ -2415,7 +2415,7 @@ fn spawn_version_check_if_possible(
     );
     if !is_local {
         let disable_version_check =
-            { config.no_version_check || std::env::var("DBT_DISABLE_VERSION_CHECK").is_ok() };
+            { config.no_version_check || dbt_vfs::env::var("DBT_DISABLE_VERSION_CHECK").is_ok() };
         let current_version = env!("CARGO_PKG_VERSION");
         if !disable_version_check {
             return Some(tokio::spawn(dbt_common::send_on_wasm::send_on_wasm(
@@ -2687,7 +2687,7 @@ fn run_verify_partial_load(arg: &EvalArgs, schedule: &Schedule<String>) {
 
     // Write to DBT_VERIFY_PARTIAL_LOAD_LOG if set; otherwise fall back to tracing so
     // the result is still visible in the normal log file.
-    if let Ok(path) = std::env::var("DBT_VERIFY_PARTIAL_LOAD_LOG") {
+    if let Ok(path) = dbt_vfs::env::var("DBT_VERIFY_PARTIAL_LOAD_LOG") {
         if let Ok(mut file) = dbt_vfs::fs::OpenOptions::new()
             .create(true)
             .append(true)

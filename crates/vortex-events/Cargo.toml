@@ -14,6 +14,7 @@ keywords.workspace = true
 edition.workspace = true
 
 [dependencies]
+dbt-vfs = { workspace = true }
 proto-rust = { path = "../proto-rust" }
 
 dbt-common = { workspace = true }

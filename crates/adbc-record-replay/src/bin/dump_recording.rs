@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    let mut args = std::env::args_os().skip(1);
+    let mut args = dbt_vfs::env::args_os().skip(1);
     let Some(path) = args.next() else {
         eprintln!("usage: dump-recordings <path/to/recordings.db>");
         return ExitCode::from(2);

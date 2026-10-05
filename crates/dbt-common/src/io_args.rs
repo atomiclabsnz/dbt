@@ -1387,7 +1387,7 @@ pub fn resolve_effective_optimize_tests(
         command,
         explicit_cli,
         project_defaults,
-        |name| std::env::var_os(name),
+        |name| dbt_vfs::env::var_os(name),
     )
 }
 
@@ -1459,7 +1459,7 @@ pub const LATEST_VERSION_POINTER_ENABLED_BY_DEFAULT_ENV: &str =
 
 pub fn resolve_latest_version_pointer_enabled_by_default(project_flags: Option<&Value>) -> bool {
     resolve_latest_version_pointer_enabled_by_default_with_env_lookup(project_flags, |name| {
-        std::env::var_os(name)
+        dbt_vfs::env::var_os(name)
     })
 }
 

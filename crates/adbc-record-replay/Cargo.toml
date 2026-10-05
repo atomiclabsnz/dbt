@@ -20,6 +20,7 @@ path = "src/bin/dump_recording.rs"
 workspace = true
 
 [dependencies]
+dbt-vfs = { workspace = true }
 adbc-core = { workspace = true }
 arrow = { workspace = true }
 arrow-schema = { workspace = true }

@@ -51,7 +51,7 @@ pub fn pick_replay_mode(
                 out_dir.join("time_machine")
             });
             // Capture the invocation command for disambiguation in the recording header
-            let invocation_command = Some(std::env::args().collect::<Vec<_>>().join(" "));
+            let invocation_command = Some(dbt_vfs::env::args().collect::<Vec<_>>().join(" "));
             Some(ReplayMode::FsTimeMachine(TimeMachineMode::Record(
                 TimeMachineRecordConfig {
                     output_path,

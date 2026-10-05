@@ -223,7 +223,7 @@ impl JsonCompatLayer {
             code: code.unwrap_or("").to_string(),
             invocation_id: self.invocation_id.to_string(),
             name: name.unwrap_or("Generic").to_string(),
-            pid: std::process::id() as i32,
+            pid: dbt_vfs::env::process_id() as i32,
             thread: std::thread::current().name().unwrap_or("main").to_string(),
             // drop the timezone offset and format as microseconds to conform to python logging timestamp parsing
             ts: Some(Utc::now().into()),

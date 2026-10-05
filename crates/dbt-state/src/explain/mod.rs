@@ -53,7 +53,7 @@ pub async fn execute_state_explain(options: StateExplainOptions) -> FsResult<()>
     {
         None
     } else if let Some(service_config) =
-        run_cache_service_config_for_state_explain(|name| std::env::var(name).ok())
+        run_cache_service_config_for_state_explain(|name| dbt_vfs::env::var(name).ok())
     {
         match GrpcRunCacheServiceClient::connect(service_config).await {
             Ok(client) => {

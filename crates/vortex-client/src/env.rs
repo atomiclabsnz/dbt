@@ -1,6 +1,6 @@
 //! Host-supplied configuration for the Vortex producer.
 
-use std::env;
+use dbt_vfs::env;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 

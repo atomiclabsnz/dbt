@@ -5,7 +5,7 @@
 
 /// Get a GitHub token from the environment, if present.
 pub fn get_github_token() -> Option<String> {
-    std::env::var("GITHUB_TOKEN")
+    dbt_vfs::env::var("GITHUB_TOKEN")
         .ok()
         .filter(|token| !token.is_empty())
 }

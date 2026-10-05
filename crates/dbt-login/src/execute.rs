@@ -39,7 +39,7 @@ fn interactive_login_scopes(default_scopes: &str, env_scopes: Option<&str>) -> S
 /// Read the access token from the most recently stored platform OAuth session
 /// (if any). Used to populate JWT-derived telemetry fields on login failure.
 fn read_cached_access_token() -> Option<String> {
-    let home = dirs::home_dir()?;
+    let home = dbt_vfs::env::home_dir()?;
     let path = home.join(".dbt").join("oauth_sessions.json");
     let bytes = std::fs::read(path).ok()?;
     let cache: OAuthSessionCache = serde_json::from_slice(&bytes).ok()?;
@@ -168,10 +168,11 @@ pub async fn execute_login(
         available: true,
     };
 
-    let env_scopes = std::env::var("DBT_OAUTH_SCOPES").ok();
+    let env_scopes = dbt_vfs::env::var("DBT_OAUTH_SCOPES").ok();
     let requested_scopes = interactive_login_scopes(OAUTH_SCOPES, env_scopes.as_deref());
 
-    let source_app = std::env::var("DBT_OAUTH_SOURCE_APP").unwrap_or_else(|_| "core_v2".to_owned());
+    let source_app =
+        dbt_vfs::env::var("DBT_OAUTH_SOURCE_APP").unwrap_or_else(|_| "core_v2".to_owned());
 
     let platform_resolver = OAuthInteractiveResolver::builder(OAUTH_CLIENT_ID)
         .scopes(requested_scopes)

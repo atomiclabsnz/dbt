@@ -12,8 +12,8 @@ pub fn create_process_event_data(package: &str) -> Process {
     Process {
         package: package.to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
-        host_os: std::env::consts::OS.to_string(),
-        host_arch: std::env::consts::ARCH.to_string(),
+        host_os: dbt_vfs::env::consts::OS.to_string(),
+        host_arch: dbt_vfs::env::consts::ARCH.to_string(),
     }
 }
 

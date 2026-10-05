@@ -34,7 +34,7 @@ use traits::GitHostClient as _;
 const FAST_PATH_DEFAULT: bool = false;
 
 fn fast_path_enabled() -> bool {
-    match std::env::var("DBT_DEPS_GIT_FAST_PATH").ok().as_deref() {
+    match dbt_vfs::env::var("DBT_DEPS_GIT_FAST_PATH").ok().as_deref() {
         Some(v) if v == "1" || v.eq_ignore_ascii_case("true") => true,
         Some(v) if v == "0" || v.eq_ignore_ascii_case("false") => false,
         _ => FAST_PATH_DEFAULT,

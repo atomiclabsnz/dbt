@@ -193,7 +193,7 @@ impl Builder {
     pub fn from_snowsql_config() -> Result<Self> {
         use crate::snowflake;
 
-        let home = dirs::home_dir().ok_or_else(|| {
+        let home = dbt_vfs::env::home_dir().ok_or_else(|| {
             Error::with_message_and_status("failed to get home directory", Status::Internal)
         })?;
         let config_path_buf = home.join(".snowsql").join("config");

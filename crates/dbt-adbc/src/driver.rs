@@ -16,9 +16,14 @@ use adbc_core::{
     error::{Error, Result, Status},
     options::{AdbcVersion, OptionDatabase, OptionValue},
 };
+use dbt_vfs::env;
 use parking_lot::RwLockUpgradableReadGuard;
 use std::{
-    collections::HashMap, env, ffi::c_int, fmt, mem, path::Path, path::PathBuf, sync::LazyLock,
+    collections::HashMap,
+    ffi::c_int,
+    fmt, mem,
+    path::{Path, PathBuf},
+    sync::LazyLock,
 };
 use std::{hash, sync::Arc};
 

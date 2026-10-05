@@ -407,7 +407,7 @@ impl TuiLayer {
             group_skipped_tests,
             progress,
             generic_op_is_bar: SccHashMap::default(),
-            is_nextest: std::env::var("NEXTEST").is_ok(),
+            is_nextest: dbt_vfs::env::var("NEXTEST").is_ok(),
         };
 
         #[cfg(not(debug_assertions))]

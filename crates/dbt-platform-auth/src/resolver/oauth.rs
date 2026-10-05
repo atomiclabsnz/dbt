@@ -109,9 +109,9 @@ impl OAuthPassiveResolver {
     }
 
     fn effective_cache_path(&self) -> Option<PathBuf> {
-        self.cache_path
-            .clone()
-            .or_else(|| dirs::home_dir().map(|h| h.join(".dbt").join("oauth_sessions.json")))
+        self.cache_path.clone().or_else(|| {
+            dbt_vfs::env::home_dir().map(|h| h.join(".dbt").join("oauth_sessions.json"))
+        })
     }
 
     fn refresh_token_url(&self, account_host: &str) -> String {
@@ -272,9 +272,9 @@ impl OAuthInteractiveResolver {
     }
 
     fn effective_cache_path(&self) -> Option<PathBuf> {
-        self.cache_path
-            .clone()
-            .or_else(|| dirs::home_dir().map(|h| h.join(".dbt").join("oauth_sessions.json")))
+        self.cache_path.clone().or_else(|| {
+            dbt_vfs::env::home_dir().map(|h| h.join(".dbt").join("oauth_sessions.json"))
+        })
     }
 
     pub async fn resolve(&self) -> Result<Credential, AuthError> {
@@ -461,10 +461,10 @@ impl OAuthInteractiveResolverBuilder {
     }
 
     pub fn build(self) -> OAuthInteractiveResolver {
-        let client_id = std::env::var("DBT_OAUTH_CLIENT_ID").unwrap_or(self.client_id);
+        let client_id = dbt_vfs::env::var("DBT_OAUTH_CLIENT_ID").unwrap_or(self.client_id);
         let register_url = self
             .register_url
-            .or_else(|| std::env::var("DBT_CLOUD_REGISTER_URL").ok())
+            .or_else(|| dbt_vfs::env::var("DBT_CLOUD_REGISTER_URL").ok())
             .unwrap_or_else(|| REGISTER_URL.to_owned());
         OAuthInteractiveResolver {
             client_id,

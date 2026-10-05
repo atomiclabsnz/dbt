@@ -38,7 +38,7 @@ fn load_profile_with_loader(
     profile_name: &str,
     target: Option<&str>,
 ) -> FsResult<DbConfig> {
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let current_dir = dbt_vfs::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     let io_args = IoArgs {
         in_dir: current_dir,
@@ -76,7 +76,7 @@ pub struct ProjectStore {
 
 impl ProjectStore {
     pub fn from_dbt_cloud_yml() -> FsResult<Option<Self>> {
-        let home_dir = match dirs::home_dir() {
+        let home_dir = match dbt_vfs::env::home_dir() {
             Some(dir) => dir,
             None => return Ok(None),
         };

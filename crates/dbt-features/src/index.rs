@@ -529,7 +529,7 @@ fn write_metadata_parquet_impl(
         .collect()
     });
 
-    if std::env::var_os("DBT_LINEAGE_TIMING").is_some() {
+    if dbt_vfs::env::var_os("DBT_LINEAGE_TIMING").is_some() {
         eprintln!(
             "[lineage] {:>8.1}ms  thread::scope write parquet (3 parallel)",
             t_write.elapsed().as_secs_f64() * 1000.0

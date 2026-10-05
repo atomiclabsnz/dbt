@@ -62,7 +62,7 @@ fn create_invocation_eval_args(eval_arg: &EvalArgs) -> InvocationEvalArgs {
 /// CLI flags, and other relevant information.
 pub fn create_invocation_attributes(package: &str, eval_arg: &EvalArgs) -> Invocation {
     // Capture raw command string
-    let raw_command = std::env::args().collect::<Vec<_>>().join(" ");
+    let raw_command = dbt_vfs::env::args().collect::<Vec<_>>().join(" ");
 
     Invocation {
         invocation_id: eval_arg.io.invocation_id.to_string(),

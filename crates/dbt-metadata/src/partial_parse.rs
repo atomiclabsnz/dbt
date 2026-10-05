@@ -169,7 +169,7 @@ impl IncrementalState {
             }
         }
         for (name, old_value) in &self.env_vars {
-            match std::env::var(name) {
+            match dbt_vfs::env::var(name) {
                 Ok(current) if current != *old_value => return Some("env var changed"),
                 // env_var(name, default) records DEFAULT_ENV_PLACEHOLDER when name is unset;
                 // a still-unset var is unchanged, not removed.

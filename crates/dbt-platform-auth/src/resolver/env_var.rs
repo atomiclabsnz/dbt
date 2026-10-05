@@ -12,7 +12,7 @@ use crate::{AuthError, Credential};
 pub struct EnvVarResolver;
 
 fn non_empty_env(name: &str) -> Option<String> {
-    std::env::var(name).ok().filter(|v| !v.is_empty())
+    dbt_vfs::env::var(name).ok().filter(|v| !v.is_empty())
 }
 
 impl EnvVarResolver {

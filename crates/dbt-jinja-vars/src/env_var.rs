@@ -71,7 +71,7 @@ pub fn env_var(
         return Err(err);
     }
 
-    match (std::env::var(var), default) {
+    match (dbt_vfs::env::var(var), default) {
         (Ok(value), _) => {
             if is_secret {
                 debug_assert!(placeholder_on_secret_access);

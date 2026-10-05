@@ -1,6 +1,6 @@
 use adbc_core::error::{Error, Result, Status};
 
-use std::env;
+use dbt_vfs::env;
 
 const TRUE_VALUES: [&str; 4] = ["1", "true", "yes", "on"];
 const FALSE_VALUES: [&str; 5] = ["0", "false", "no", "off", ""];

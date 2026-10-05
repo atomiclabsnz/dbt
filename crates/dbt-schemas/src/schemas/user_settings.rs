@@ -12,7 +12,7 @@ pub struct UserSettings {
 impl UserSettings {
     /// Path to `~/.dbt/user_settings.yml`, or `None` if the home directory can't be determined.
     pub fn path() -> Option<PathBuf> {
-        dirs::home_dir().map(|h| h.join(".dbt").join("user_settings.yml"))
+        dbt_vfs::env::home_dir().map(|h| h.join(".dbt").join("user_settings.yml"))
     }
 
     /// Load from `~/.dbt/user_settings.yml`. Returns default (empty flags) on any error.

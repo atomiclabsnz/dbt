@@ -33,7 +33,7 @@ pub fn render_secrets(rendered_str: String) -> FsResult<String> {
             let full_match = &caps[0]; // This is the entire placeholder
 
             // Check if the secret exists
-            match std::env::var(var_name) {
+            match dbt_vfs::env::var(var_name) {
                 Ok(value) => {
                     // Replace the entire placeholder with the value
                     result = result.replace(full_match, &value);

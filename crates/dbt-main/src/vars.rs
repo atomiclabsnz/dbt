@@ -187,11 +187,11 @@ pub fn apply_engine_env_var_aliases() {
 
         let engine_var = format!("DBT_ENGINE_{}", suffix);
 
-        if let Ok(value) = std::env::var(&engine_var) {
+        if let Ok(value) = dbt_vfs::env::var(&engine_var) {
             // SAFETY: Called before any threads are spawned
             #[allow(clippy::disallowed_methods)]
             unsafe {
-                std::env::set_var(dbt_var, value);
+                dbt_vfs::env::set_var(dbt_var, value);
             }
         }
     }
@@ -202,7 +202,7 @@ pub fn apply_engine_env_var_aliases() {
 /// These are typically dbt-core specific variables that have no effect in fusion.
 /// Returns a list of the unused variables that were set (for testing purposes).
 pub fn warn_unused_engine_env_vars() -> Vec<String> {
-    let unused: Vec<String> = std::env::vars()
+    let unused: Vec<String> = dbt_vfs::env::vars()
         .map(|(k, _)| k)
         .filter(|k| KNOWN_UNUSED_ENGINE_ENV_VARS.contains(&k.as_str()))
         .collect();
@@ -223,7 +223,7 @@ pub fn warn_unused_engine_env_vars() -> Vec<String> {
 /// variables must not use this prefix to avoid conflicts with current or future
 /// engine-defined variables.
 pub fn validate_engine_env_vars() -> FsResult<()> {
-    let unknown: Vec<String> = std::env::vars()
+    let unknown: Vec<String> = dbt_vfs::env::vars()
         .map(|(k, _)| k)
         .filter(|k| k.starts_with(ENGINE_ENV_PREFIX) && !KNOWN_ENGINE_ENV_VARS.contains(k))
         .collect();

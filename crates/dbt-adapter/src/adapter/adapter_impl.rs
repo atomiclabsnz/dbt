@@ -151,7 +151,7 @@ fn debug_compare_column_types(
     adapter_impl: &AdapterImpl,
     mut from_local: Vec<Column>,
 ) {
-    if std::env::var("DEBUG_COMPARE_LOCAL_REMOTE_COLUMNS_TYPES").is_ok() {
+    if dbt_vfs::env::var("DEBUG_COMPARE_LOCAL_REMOTE_COLUMNS_TYPES").is_ok() {
         match adapter_impl.get_columns_in_relation_uncached(state, relation) {
             Ok(mut from_remote) => {
                 from_remote.sort_by(|a, b| a.name().cmp(b.name()));

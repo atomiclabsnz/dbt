@@ -8,7 +8,7 @@ use crate::service_config::{DEFAULT_LOG_PREFIX, RunCacheServiceConfig};
 use super::types::StateExplainOptions;
 
 pub(super) fn state_explain_log_config_from_env() -> RunCacheServiceConfig {
-    state_explain_log_config_from_getter(|name| std::env::var(name).ok())
+    state_explain_log_config_from_getter(|name| dbt_vfs::env::var(name).ok())
 }
 
 pub(super) fn state_explain_log_config_from_getter<F>(mut get_env: F) -> RunCacheServiceConfig
@@ -164,7 +164,7 @@ fn absolute_path(path: &Path) -> PathBuf {
     if path.is_absolute() {
         path.to_path_buf()
     } else {
-        std::env::current_dir()
+        dbt_vfs::env::current_dir()
             .unwrap_or_else(|err| {
                 tracing::warn!(
                     "Failed to resolve the current directory, resolving {} against '.': {err}",
@@ -188,7 +188,7 @@ fn expand_tilde(path: &str) -> PathBuf {
     let Some(suffix) = path.strip_prefix("~/") else {
         return PathBuf::from(path);
     };
-    match dirs::home_dir() {
+    match dbt_vfs::env::home_dir() {
         Some(home) => home.join(suffix),
         None => {
             tracing::warn!("Failed to resolve the home directory while expanding '{path}'");

@@ -602,7 +602,7 @@ fn discover_project_id() -> Option<String> {
     struct ProjectName {
         name: String,
     }
-    let mut dir = std::env::current_dir().ok()?;
+    let mut dir = dbt_vfs::env::current_dir().ok()?;
     loop {
         let candidate = dir.join("dbt_project.yml");
         if candidate.exists() {
@@ -637,7 +637,8 @@ pub fn login_event(
     let claims = access_token.and_then(extract_login_jwt_claims);
     let c = claims.as_ref();
 
-    let default_profiles_path = dirs::home_dir().map(|h| h.join(".dbt").join("profiles.yml"));
+    let default_profiles_path =
+        dbt_vfs::env::home_dir().map(|h| h.join(".dbt").join("profiles.yml"));
     let user_cookie = default_profiles_path
         .as_deref()
         .map(get_user_id)

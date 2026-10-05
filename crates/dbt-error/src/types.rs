@@ -612,7 +612,7 @@ impl FsError {
             return self.with_location(location);
         }
 
-        let Ok(in_dir) = std::env::var("SDF_IN_DIR").map(PathBuf::from) else {
+        let Ok(in_dir) = dbt_vfs::env::var("SDF_IN_DIR").map(PathBuf::from) else {
             return self.with_location(location);
         };
 

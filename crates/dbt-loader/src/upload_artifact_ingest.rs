@@ -141,7 +141,7 @@ fn should_upload_artifacts() -> bool {
         return false;
     }
 
-    std::env::var(DBT_INVOCATION_ENV)
+    dbt_vfs::env::var(DBT_INVOCATION_ENV)
         .ok()
         .is_none_or(|env| env.as_str() == "manual")
 }
@@ -157,7 +157,7 @@ fn is_truthy_value(value: &str) -> bool {
 // variable is set and value is not empty and not one of "0", "false", or "f"
 // (case-insensitive).
 fn is_truthy_env_var(var_name: &str) -> bool {
-    std::env::var(var_name)
+    dbt_vfs::env::var(var_name)
         .ok()
         .is_some_and(|value| is_truthy_value(&value))
 }
@@ -440,7 +440,7 @@ async fn resolve_log_path(io: &IoArgs) -> Option<PathBuf> {
 }
 
 async fn resolve_publication_path(io: &IoArgs) -> Option<PathBuf> {
-    let env_path = std::env::var(DBT_CLOUD_PUBLICATION_FILE_PATH)
+    let env_path = dbt_vfs::env::var(DBT_CLOUD_PUBLICATION_FILE_PATH)
         .ok()
         .filter(|value| !value.is_empty())
         .map(PathBuf::from);

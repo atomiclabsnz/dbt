@@ -4,9 +4,9 @@ pub mod command;
 pub mod dist;
 mod proc;
 pub mod python;
+use dbt_vfs::env;
 use std::{
     collections::HashSet,
-    env,
     io::Read,
     path::{Path, PathBuf},
     sync::mpsc,

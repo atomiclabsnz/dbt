@@ -99,7 +99,7 @@ impl TokenStore {
     /// Resolve the on-disk auth file path. Honors `DBT_ENGINE_STATE_HOME`, otherwise
     /// uses `dirs::home_dir()`. Returns `None` when neither resolves.
     pub fn discover() -> Option<Self> {
-        Self::discover_from(std::env::var(HOME_ENV).ok(), dirs::home_dir())
+        Self::discover_from(dbt_vfs::env::var(HOME_ENV).ok(), dbt_vfs::env::home_dir())
     }
 
     pub fn discover_from(env_home: Option<String>, fallback_home: Option<PathBuf>) -> Option<Self> {

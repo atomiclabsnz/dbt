@@ -95,9 +95,9 @@ pub async fn debug(
     // platform info
     let platform_info_display = format!(
         "platform: {} {} ({})",
-        std::env::consts::OS,
-        std::env::consts::ARCH,
-        std::env::consts::FAMILY
+        dbt_vfs::env::consts::OS,
+        dbt_vfs::env::consts::ARCH,
+        dbt_vfs::env::consts::FAMILY
     );
     emit_info_progress_message(create_progress_msg(
         ACTION_DEBUGGING,

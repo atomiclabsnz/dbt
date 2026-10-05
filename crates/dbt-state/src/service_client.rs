@@ -213,7 +213,7 @@ impl Default for RunCacheClientMetadata {
         Self {
             session_id: new_request_id(),
             system_user_id: String::new(),
-            os_name: std::env::consts::OS.to_string(),
+            os_name: dbt_vfs::env::consts::OS.to_string(),
             dbt_invocation_id: String::new(),
             dbt_cloud_run_id: get_cloud_run_id(),
         }
@@ -222,7 +222,7 @@ impl Default for RunCacheClientMetadata {
 
 /// Return the dbt platform run ID, or an empty string when not running there.
 pub fn get_cloud_run_id() -> String {
-    std::env::var("DBT_CLOUD_RUN_ID").unwrap_or_default()
+    dbt_vfs::env::var("DBT_CLOUD_RUN_ID").unwrap_or_default()
 }
 
 #[derive(Debug, Clone)]

@@ -5,11 +5,11 @@ use crate::tracing::dbt_metrics::{error_count_checkpoint, return_exit_code_from_
 use crate::{ErrorCode, FsResult, err, fs_err, stdfs::canonicalize};
 use dbt_telemetry::{ExecutionPhase, NodeOutcome};
 use dbt_vfs::PathExt as _;
+use dbt_vfs::env;
 use dbt_yaml::Span;
 use pathdiff::diff_paths;
 use std::{
     any::Any,
-    env,
     ffi::OsStr,
     io::Read,
     path::{Path, PathBuf},

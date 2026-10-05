@@ -5,7 +5,7 @@ use crate::profile_setup::{ProfileAction, ProfileSetup};
 use dbt_common::pretty_string::{GREEN, YELLOW};
 use dbt_common::tracing::dbt_emit::emit_info_log_message;
 use dbt_common::{ErrorCode, FsResult, fs_err};
-use std::env;
+use dbt_vfs::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 

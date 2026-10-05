@@ -13,6 +13,7 @@ dependencies = [
  "dashmap",
  "dbt-adbc",
  "dbt-fusion-workspace-hack",
+ "dbt-vfs",
  "once_cell",
  "parquet",
  "regex",
@@ -2804,6 +2805,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tempfile",
+ "time",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -3000,6 +3002,7 @@ version = "2.0.0-beta.2"
 dependencies = [
  "dbt-fusion-workspace-hack",
  "dbt-schemas",
+ "dbt-vfs",
 ]
 
 [[package]]
@@ -3192,6 +3195,7 @@ dependencies = [
  "dbt-jinja-utils",
  "dbt-loader",
  "dbt-schemas",
+ "dbt-vfs",
  "dbt-yaml",
  "dialoguer 0.12.0",
  "dirs",
@@ -3275,6 +3279,7 @@ version = "2.0.0-beta.2"
 dependencies = [
  "chrono",
  "dbt-fusion-workspace-hack",
+ "dbt-vfs",
  "dbt-yaml",
  "indexmap 2.14.0",
  "minijinja",
@@ -3946,6 +3951,7 @@ dependencies = [
  "bytes",
  "dbt-fusion-workspace-hack",
  "dbt-tracing",
+ "dbt-vfs",
  "dbt-yaml",
  "fake",
  "parquet",
@@ -4088,6 +4094,7 @@ name = "dbt-vfs"
 version = "2.0.0-beta.2"
 dependencies = [
  "bytes",
+ "dirs",
  "parquet",
  "tokio",
  "walkdir",
@@ -10082,6 +10089,7 @@ dependencies = [
  "dbt-fusion-workspace-hack",
  "dbt-jinja-utils",
  "dbt-schemas",
+ "dbt-vfs",
  "dbt-vortex",
  "dbt-yaml",
  "dirs",

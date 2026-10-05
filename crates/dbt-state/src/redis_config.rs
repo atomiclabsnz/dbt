@@ -1,4 +1,4 @@
-use std::env;
+use dbt_vfs::env;
 use std::str::FromStr;
 use url::Url;
 

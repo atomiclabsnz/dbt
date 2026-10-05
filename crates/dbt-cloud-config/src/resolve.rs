@@ -7,7 +7,7 @@ pub use dbt_schemas::schemas::{CloudCredentials, ResolvedCloudConfig};
 /// unset or empty. This prevents empty env vars from overriding valid config
 /// file values.
 fn non_empty_env(name: &str) -> Option<String> {
-    std::env::var(name).ok().filter(|v| !v.is_empty())
+    dbt_vfs::env::var(name).ok().filter(|v| !v.is_empty())
 }
 
 /// Build a fully-resolved cloud config by applying precedence:

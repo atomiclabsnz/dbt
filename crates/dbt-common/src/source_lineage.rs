@@ -71,7 +71,7 @@ fn project_dir() -> PathBuf {
         .lock()
         .expect("project dir lock poisoned")
         .clone()
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
+        .unwrap_or_else(|| dbt_vfs::env::current_dir().unwrap_or_default())
 }
 
 fn load_overrides_from(path: &Path) -> OverrideMap {
@@ -189,7 +189,7 @@ fn relaunch_with_resolutions(models: &[ModelLineage]) {
         prune_stale(map, models);
         save_overrides_to(&dir.join(OVERRIDES_FILE_NAME), map);
     });
-    let mut args = std::env::args();
+    let mut args = dbt_vfs::env::args();
     let Some(program) = args.next() else {
         return;
     };
@@ -282,7 +282,7 @@ pub fn print_report() {
 
     if ambiguous > 0 {
         println!();
-        let already_relaunched = std::env::var_os(RELAUNCHED_ENV_VAR).is_some();
+        let already_relaunched = dbt_vfs::env::var_os(RELAUNCHED_ENV_VAR).is_some();
         let interactive = should_prompt_interactively(
             resolve_ambiguous_cols_flag().load(Ordering::Relaxed),
             std::io::stdin().is_terminal(),

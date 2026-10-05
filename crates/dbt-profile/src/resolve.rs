@@ -249,7 +249,7 @@ fn resolve_x_alt_target(
     if let Some(t) = override_name {
         return Ok(Some(t.to_owned()));
     }
-    if let Some(t) = std::env::var("DBT_X_ALT_TARGET")
+    if let Some(t) = dbt_vfs::env::var("DBT_X_ALT_TARGET")
         .ok()
         .filter(|s| !s.is_empty())
     {
@@ -300,7 +300,7 @@ pub fn find_profiles_path(profiles_dir: Option<&Path>) -> Result<PathBuf> {
         });
     }
 
-    if let Ok(cwd) = std::env::current_dir() {
+    if let Ok(cwd) = dbt_vfs::env::current_dir() {
         let p = cwd.join(PROFILES_YML);
         if p.vfs_exists() {
             return Ok(p);
@@ -308,7 +308,7 @@ pub fn find_profiles_path(profiles_dir: Option<&Path>) -> Result<PathBuf> {
         searched.push(p);
     }
 
-    if let Some(home) = dirs::home_dir() {
+    if let Some(home) = dbt_vfs::env::home_dir() {
         let p = home.join(".dbt").join(PROFILES_YML);
         if p.vfs_exists() {
             return Ok(p);
@@ -333,7 +333,10 @@ pub fn resolve_target(
         return Ok(t.to_owned());
     }
 
-    if let Some(t) = std::env::var("DBT_TARGET").ok().filter(|s| !s.is_empty()) {
+    if let Some(t) = dbt_vfs::env::var("DBT_TARGET")
+        .ok()
+        .filter(|s| !s.is_empty())
+    {
         return Ok(t);
     }
 
@@ -473,7 +476,7 @@ fn render_secrets(s: &str) -> Result<String> {
     for caps in re.captures_iter(s) {
         let var_name = &caps[1];
         let full_match = &caps[0];
-        match std::env::var(var_name) {
+        match dbt_vfs::env::var(var_name) {
             Ok(value) => result = result.replace(full_match, &value),
             Err(_) => {
                 return Err(ProfileError::Other(format!(

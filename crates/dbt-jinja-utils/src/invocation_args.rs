@@ -1,4 +1,5 @@
-use std::{collections::BTreeMap, env};
+use dbt_vfs::env;
+use std::collections::BTreeMap;
 
 use dbt_common::io_args::EvalArgs;
 use dbt_common::io_args::LogLevel;

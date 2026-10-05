@@ -71,7 +71,7 @@ fn find_token_positions_in_file(file: &Path, token: &str) -> FsResult<Vec<(u32, 
 
 /// Check if SDF debug mode is enabled
 pub fn is_sdf_debug() -> bool {
-    std::env::var("SDF_DEBUG")
+    dbt_vfs::env::var("SDF_DEBUG")
         .as_ref()
         .map(String::as_str)
         .map(str::parse::<i32>)

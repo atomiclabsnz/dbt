@@ -34,7 +34,7 @@ const PATH_MARKERS: &[(&str, InstallMethod)] = &[
 
 impl InstallMethod {
     pub fn detect() -> Self {
-        match std::env::current_exe() {
+        match dbt_vfs::env::current_exe() {
             Ok(binary_path) => Self::detect_from_path(&binary_path),
             Err(_) => InstallMethod::Other,
         }

@@ -129,7 +129,7 @@ pub const DBT_ENV_CUSTOM_ENV_PREFIX: &str = "DBT_ENV_CUSTOM_ENV_";
 /// stripping the prefix from keys. Matches dbt-core behavior where
 /// e.g. `DBT_ENV_CUSTOM_ENV_FOO=bar` becomes `{"FOO": "bar"}`.
 pub fn collect_dbt_custom_envs() -> std::collections::BTreeMap<String, String> {
-    std::env::vars()
+    dbt_vfs::env::vars()
         .filter_map(|(k, v)| {
             k.strip_prefix(DBT_ENV_CUSTOM_ENV_PREFIX)
                 .map(|s| (s.to_string(), v))

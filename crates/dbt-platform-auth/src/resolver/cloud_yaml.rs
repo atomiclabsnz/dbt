@@ -33,12 +33,12 @@ struct DbtProjectFile {
 }
 
 fn non_empty_env(name: &str) -> Option<String> {
-    std::env::var(name).ok().filter(|v| !v.is_empty())
+    dbt_vfs::env::var(name).ok().filter(|v| !v.is_empty())
 }
 
 impl CloudYamlResolver {
     fn default_cloud_path() -> Option<PathBuf> {
-        dirs::home_dir().map(|h| h.join(".dbt").join("dbt_cloud.yml"))
+        dbt_vfs::env::home_dir().map(|h| h.join(".dbt").join("dbt_cloud.yml"))
     }
 
     fn default_project_path() -> PathBuf {

@@ -50,7 +50,7 @@ use std::{
 
 // ── timing helper (enabled via DBT_PP_TIMING=1) ───────────────────────────────
 fn t(label: &str, start: Instant) {
-    if std::env::var_os("DBT_PP_TIMING").is_some() {
+    if dbt_vfs::env::var_os("DBT_PP_TIMING").is_some() {
         eprintln!(
             "[pp] {:>7.2}ms  {label}",
             start.elapsed().as_secs_f64() * 1000.0

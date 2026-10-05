@@ -13,6 +13,7 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
+dbt-vfs = { workspace = true }
 arrow-schema = { workspace = true, features = ["canonical_extension_types"] }
 dbt-fusion-workspace-hack = { version = "0.1" }
 dbt-tracing = { workspace = true }

@@ -1,7 +1,7 @@
 use dbt_common::constants::DBT_CDN_URL;
+use dbt_vfs::env;
 use reqwest;
 use serde_json::Value;
-use std::env;
 
 const VERSION_CHECK_DISABLED_ENV: &str = "DBT_DISABLE_VERSION_CHECK";
 

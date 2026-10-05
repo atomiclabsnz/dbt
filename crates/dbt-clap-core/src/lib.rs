@@ -5,8 +5,8 @@ use dbt_common::{ErrorCode, FsResult, fs_err, stdfs};
 use dbt_yaml::Value as YValue;
 use serde::{Deserialize, Serialize};
 
+use dbt_vfs::env;
 use std::any::Any;
-use std::env;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fmt;

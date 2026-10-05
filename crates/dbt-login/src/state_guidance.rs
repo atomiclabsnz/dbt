@@ -29,7 +29,7 @@ impl StateConfigSource {
 /// Checks whether dbt State is locally configured via env var or YAML files.
 /// Returns the first matching source (env > project > user settings), or `None`.
 pub fn check_state_configured() -> Option<StateConfigSource> {
-    if std::env::var(MANAGE_STATE_ENV)
+    if dbt_vfs::env::var(MANAGE_STATE_ENV)
         .map(|v| v.eq_ignore_ascii_case("true"))
         .unwrap_or(false)
     {

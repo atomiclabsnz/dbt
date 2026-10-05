@@ -375,7 +375,7 @@ async fn do_execute_fs(
             .map(Ok)
             .unwrap_or_else(|| {
                 if explain_args.log_file.is_some() {
-                    std::env::current_dir().map_err(Into::into)
+                    dbt_vfs::env::current_dir().map_err(Into::into)
                 } else {
                     determine_project_dir(&[], DBT_PROJECT_YML)
                 }
@@ -631,7 +631,7 @@ fn emit_version_info(eval_arg: &EvalArgs, command_name: &str) -> FsResult<()> {
     #[cfg(debug_assertions)]
     {
         use chrono::{DateTime, Local};
-        use std::env;
+        use dbt_vfs::env;
         // ferrion-wasm: the binary's own mtime is a host file, not a project
         // file: read it from the real disk, best effort (a wasm module has no
         // executable path, and the VFS does not hold the binary).
@@ -1478,7 +1478,7 @@ impl<'a> AllPhasesExecutor<'a> {
                 );
             } else {
                 let t_ble = {
-                    let timing = std::env::var_os("DBT_LINEAGE_TIMING").is_some();
+                    let timing = dbt_vfs::env::var_os("DBT_LINEAGE_TIMING").is_some();
                     if timing {
                         eprintln!("[lineage] column_lineage hook start");
                     }
@@ -1492,7 +1492,7 @@ impl<'a> AllPhasesExecutor<'a> {
                     .await
                 {
                     Ok(column_lineage) => {
-                        if std::env::var_os("DBT_LINEAGE_TIMING").is_some() {
+                        if dbt_vfs::env::var_os("DBT_LINEAGE_TIMING").is_some() {
                             eprintln!(
                                 "[lineage] {:>8.1}ms  cll_edges_from_lineage_results ({})",
                                 t_ble.elapsed().as_secs_f64() * 1000.0,
@@ -1848,7 +1848,7 @@ async fn run_docs_generate(
         duckdb_cdn_base: generate_args.duckdb_cdn_base,
         // Consent is resolved here because the project and profile are only
         // readable on this machine; the browser reads the answer, not the inputs.
-        analytics_enabled: std::env::var("DO_NOT_TRACK").as_deref() != Ok("1")
+        analytics_enabled: dbt_vfs::env::var("DO_NOT_TRACK").as_deref() != Ok("1")
             && cli
                 .common_args()
                 .get_send_anonymous_usage_stats_for_project(project_dir),
@@ -2086,7 +2086,7 @@ async fn run_docs_serve(
             index_dir: index_dir.clone(),
             output_dir: site_dir.clone(),
             duckdb_cdn_base: None,
-            analytics_enabled: std::env::var("DO_NOT_TRACK").as_deref() != Ok("1")
+            analytics_enabled: dbt_vfs::env::var("DO_NOT_TRACK").as_deref() != Ok("1")
                 && send_anonymous_usage_stats,
         };
         match dbt_docs_server::export_site(&providers, &options) {

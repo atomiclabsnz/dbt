@@ -623,7 +623,7 @@ fn apply_connection_args(
     // LOGIN_TIMEOUT defaults to 300s,
     // see https://github.com/dbt-labs/gosnowflake/blob/c1d9c4ea1fde32184cbce1f728a4db2ea0cec048/dsn.go         = 300 * time.Second // Timeout for retry for login EXCLUDING clientTimeout
     // but is configurable via an env var to fail fast in certain cases
-    if let Ok(login_timeout) = std::env::var("DBT_SNOWFLAKE_LOGIN_TIMEOUT") {
+    if let Ok(login_timeout) = dbt_vfs::env::var("DBT_SNOWFLAKE_LOGIN_TIMEOUT") {
         builder.with_named_option(snowflake::LOGIN_TIMEOUT, login_timeout)?;
     }
 
@@ -633,10 +633,10 @@ fn apply_connection_args(
         .unwrap_or_else(|| DEFAULT_REQUEST_TIMEOUT.to_string());
     builder.with_named_option(snowflake::REQUEST_TIMEOUT, request_timeout)?;
 
-    if let Ok(client_timeout) = std::env::var("DBT_SNOWFLAKE_CLIENT_TIMEOUT") {
+    if let Ok(client_timeout) = dbt_vfs::env::var("DBT_SNOWFLAKE_CLIENT_TIMEOUT") {
         builder.with_named_option(snowflake::CLIENT_TIMEOUT, client_timeout)?;
     }
-    if let Ok(auth_client_timeout) = std::env::var("DBT_SNOWFLAKE_AUTH_CLIENT_TIMEOUT") {
+    if let Ok(auth_client_timeout) = dbt_vfs::env::var("DBT_SNOWFLAKE_AUTH_CLIENT_TIMEOUT") {
         builder.with_named_option(snowflake::AUTH_CLIENT_TIMEOUT, auth_client_timeout)?;
     }
 

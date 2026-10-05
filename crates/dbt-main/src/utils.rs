@@ -34,7 +34,7 @@ impl InvocationContext {
         common_args: &dbt_clap_core::CommonArgs,
     ) -> Self {
         let selector = common_args.select.as_ref().map(|v| v.join(" "));
-        let git = std::env::current_dir()
+        let git = dbt_vfs::env::current_dir()
             .ok()
             .and_then(|cwd| dbt_metadata::partial_parse::read_git_info(&cwd));
         Self {
@@ -42,7 +42,7 @@ impl InvocationContext {
             invocation_id: io.invocation_id.to_string(),
             command: command.as_str().to_string(),
             selector,
-            cli_args: std::env::args().collect(),
+            cli_args: dbt_vfs::env::args().collect(),
             target_name: common_args.target.clone(),
             profile_name: common_args.profile.clone(),
             git_sha: git

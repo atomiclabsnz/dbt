@@ -39,7 +39,7 @@ const FS_DEFAULT_MAX_BLOCKING_THREADS: usize = 512;
 /// SAFETY: This modifies the process environment. Must be called before spawning
 /// any threads and before CLI parsing.
 fn maybe_load_dotenv() {
-    if let Ok(cwd) = std::env::current_dir() {
+    if let Ok(cwd) = dbt_vfs::env::current_dir() {
         let env_path = cwd.join(".env");
         if env_path.vfs_is_file() {
             // from_path does NOT override existing env vars, which is exactly what we want:
@@ -60,7 +60,7 @@ fn init_env_before_parse() {
 }
 
 fn parse_cli_or_exit(cli_parser: &CliParser) -> Box<Cli> {
-    let args = std::env::args_os().collect::<Vec<_>>();
+    let args = dbt_vfs::env::args_os().collect::<Vec<_>>();
     cli_parser.print_json_version_and_exit_for_args(&args);
 
     match cli_parser.try_parse_from(args) {
@@ -159,7 +159,7 @@ pub fn run_cli_with_code(cli: Box<Cli>, arg: SystemArgs, feature_stack: Arc<Feat
 
     // If execution panics, exit with a status 2 (but not if RUST_BACKTRACE is
     // set to 1, in which case we want to see the backtrace):
-    if arg.exit_process_on_panic && std::env::var("RUST_BACKTRACE").unwrap_or_default() != "1" {
+    if arg.exit_process_on_panic && dbt_vfs::env::var("RUST_BACKTRACE").unwrap_or_default() != "1" {
         std::panic::set_hook(Box::new(|info| {
             eprintln!("{} {}", RED.apply_to(format!("{PANIC}:")), info);
             let _ = io::stdout().flush();

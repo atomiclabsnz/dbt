@@ -185,8 +185,8 @@ impl EmitPolicy {
     pub(crate) fn from_inputs(version_check: bool) -> Self {
         let (is_test, test_warnings_enabled) = if cfg!(debug_assertions) {
             (
-                std::env::var(NEXTEST_ENV).is_ok(),
-                std::env::var(TEST_DEPS_LATEST_VERSION_ENV).is_ok(),
+                dbt_vfs::env::var(NEXTEST_ENV).is_ok(),
+                dbt_vfs::env::var(TEST_DEPS_LATEST_VERSION_ENV).is_ok(),
             )
         } else {
             (false, false)

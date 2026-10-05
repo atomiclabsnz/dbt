@@ -30,7 +30,7 @@ impl AppState {
         has_dbt_state: bool,
         send_anonymous_usage_stats: bool,
     ) -> Self {
-        let do_not_track = std::env::var("DO_NOT_TRACK").as_deref() == Ok("1");
+        let do_not_track = dbt_vfs::env::var("DO_NOT_TRACK").as_deref() == Ok("1");
         let project_loaded = Self::compute_project_loaded(&index_dir);
         let generation = if project_loaded {
             Self::compute_generation(&index_dir)

@@ -20,7 +20,7 @@ const MAX_DEPS_CONCURRENCY: usize = 16;
 ///
 /// Override with `DBT_DEPS_MAX_CONCURRENCY` (clamped to 1..=16).
 pub fn max_resolve_concurrency() -> usize {
-    match std::env::var("DBT_DEPS_MAX_CONCURRENCY") {
+    match dbt_vfs::env::var("DBT_DEPS_MAX_CONCURRENCY") {
         Ok(raw) => raw
             .parse::<usize>()
             .map(|n| n.clamp(1, MAX_DEPS_CONCURRENCY))
@@ -140,7 +140,7 @@ pub fn core_sha1_hash_packages(_packages: &[DbtPackageEntry]) -> String {
 
 pub fn scrub_package_name_secret_env_vars(package_name: &str) -> Option<Cow<'_, str>> {
     let mut scrubbed = Cow::Borrowed(package_name);
-    for (_, secret) in std::env::vars()
+    for (_, secret) in dbt_vfs::env::vars()
         .filter(|(key, value)| key.starts_with(SECRET_ENV_VAR_PREFIX) && !value.trim().is_empty())
     {
         if scrubbed.contains(secret.as_str()) {
