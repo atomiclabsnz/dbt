@@ -1024,13 +1024,21 @@ pub fn reconstruct_package_metadata(snapshot: &PackageSnapshot) -> FsResult<DbtP
         })
         .collect();
 
-    let minimal_project_json = serde_json::json!({ "name": &snapshot.package_name });
-    let dbt_project = serde_json::from_value(minimal_project_json).map_err(|e| {
-        fs_err!(
-            ErrorCode::Generic,
-            "Failed to construct DbtProject stub: {e}"
-        )
-    })?;
+    // From a dbt_yaml Value rather than a serde_json one: the serde_json
+    // deserializer would be instantiated for the whole Project*Config tree for
+    // this one stub (wasm32 code size).
+    let mut minimal_project = dbt_yaml::Mapping::new();
+    minimal_project.insert(
+        dbt_yaml::Value::from("name"),
+        dbt_yaml::Value::from(snapshot.package_name.as_str()),
+    );
+    let dbt_project =
+        dbt_yaml::from_value(dbt_yaml::Value::from(minimal_project)).map_err(|e| {
+            fs_err!(
+                ErrorCode::Generic,
+                "Failed to construct DbtProject stub: {e}"
+            )
+        })?;
 
     Ok(DbtPackage {
         dbt_project,

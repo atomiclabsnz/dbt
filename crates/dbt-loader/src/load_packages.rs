@@ -330,13 +330,18 @@ pub fn construct_internal_packages(
                     package_dir_name
                 )
             })?;
-        let parsed: DbtProject = dbt_yaml::from_str(&yml_content).map_err(|e| {
-            fs_err!(
-                ErrorCode::InvalidConfig,
-                "Failed to parse internal dbt_project.yml: {}",
-                e
-            )
-        })?;
+        // Via a Value, like every user dbt_project.yml: deserializing the
+        // DbtProject straight from YAML text instantiates the text deserializer
+        // for the whole Project*Config tree (wasm32 code size).
+        let parsed: DbtProject = dbt_yaml::from_str::<dbt_yaml::Value>(&yml_content)
+            .and_then(dbt_yaml::from_value)
+            .map_err(|e| {
+                fs_err!(
+                    ErrorCode::InvalidConfig,
+                    "Failed to parse internal dbt_project.yml: {}",
+                    e
+                )
+            })?;
         let dbt_project = build_internal_dbt_project(parsed)?;
         let project_name = dbt_project.name.clone();
 
