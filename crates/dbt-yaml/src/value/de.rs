@@ -14,7 +14,7 @@ mod borrowed;
 mod owned;
 
 pub(crate) use borrowed::{MapRefDeserializer, SeqRefDeserializer};
-pub use owned::ValueDeserializer;
+pub use owned::{RefModeDeserializer, ValueDeserializer};
 
 /// A type alias for the result of transforming a [Value] into another [Value].
 pub type TransformedResult =
@@ -87,6 +87,22 @@ impl Value {
         );
 
         T::deserialize(de)
+    }
+
+    /// Deserializes `T` from this value with exactly the semantics of
+    /// `T::deserialize(&value)`, through the owned deserializer on a clone
+    /// (see [RefModeDeserializer]): one deserializer monomorphised per type
+    /// instead of two.
+    pub fn to_owned_typed<T>(&self) -> Result<T, Error>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        T::deserialize(RefModeDeserializer::new_with(
+            self.clone(),
+            Path::Root,
+            None,
+            None,
+        ))
     }
 
     /// Deserialize a [Value] into an instance of some [Deserialize] type `T`,
@@ -513,17 +529,21 @@ impl DeserializerState {
     }
 
     /// Constructs a Value [Deserializer] from the captured state
+    ///
+    /// It deserializes a clone of the captured value with the borrowed
+    /// deserializer's semantics (upstream returns a `ValueRefDeserializer`
+    /// here): see [RefModeDeserializer].
     pub fn get_deserializer<'de, 'u>(
         &'de mut self,
         unused_key_callback: Option<UnusedKeyCallback<'u>>,
-    ) -> ValueRefDeserializer<'de, 'de, 'u, 'de> {
+    ) -> RefModeDeserializer<'de, 'u, 'de> {
         let field_transformer = self
             .field_transformer
             .as_deref_mut()
             .map(|cb| &mut *cb as FieldTransformer<'_>);
 
-        ValueRefDeserializer::new_with(
-            &self.value,
+        RefModeDeserializer::new_with(
+            self.value.clone(),
             *self.path.as_path(),
             unused_key_callback,
             field_transformer,

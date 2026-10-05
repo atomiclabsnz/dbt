@@ -19,7 +19,6 @@ use dbt_schemas::schemas::{DbtModel, DbtSnapshot};
 use dbt_telemetry::AdapterConnectionOpen;
 use minijinja::State;
 use parking_lot::RwLock;
-use serde::Deserialize;
 
 use crate::cache::RelationCache;
 use crate::engine::query_comment::QueryCommentConfig;
@@ -528,13 +527,13 @@ impl AdapterEngine for AdbcEngine {
 fn databricks_compute_from_state(state: &State) -> Option<String> {
     let yaml_node = dbt_yaml::to_value(state.lookup("model", &[]).as_ref()?).ok()?;
 
-    if let Ok(model) = DbtModel::deserialize(&yaml_node) {
+    if let Ok(model) = yaml_node.to_owned_typed::<DbtModel>() {
         if let Some(databricks_attr) = &model.__adapter_attr__.databricks_attr {
             databricks_attr.databricks_compute.clone()
         } else {
             None
         }
-    } else if let Ok(snapshot) = DbtSnapshot::deserialize(&yaml_node) {
+    } else if let Ok(snapshot) = yaml_node.to_owned_typed::<DbtSnapshot>() {
         if let Some(databricks_attr) = &snapshot.__adapter_attr__.databricks_attr {
             databricks_attr.databricks_compute.clone()
         } else {

@@ -466,6 +466,80 @@ macro_rules! maybe_expecting_should_be {
     }};
 }
 
+/// The owned [ValueDeserializer] in ref mode: deserializes exactly as the
+/// borrowed `ValueRefDeserializer` would, from a value it owns (a clone), so
+/// callers that only need by-reference *semantics* do not instantiate the
+/// borrowed deserializer for their types. Only for `DeserializeOwned` targets:
+/// it cannot lend `&'de str`s.
+pub struct RefModeDeserializer<'a, 'u, 'f>(ValueDeserializer<'a, 'u, 'f>);
+
+impl<'a, 'u, 'f> RefModeDeserializer<'a, 'u, 'f> {
+    pub(crate) fn new_with(
+        value: Value,
+        path: Path<'a>,
+        unused_key_callback: Option<UnusedKeyCallback<'u>>,
+        field_transformer: Option<FieldTransformer<'f>>,
+    ) -> Self {
+        RefModeDeserializer(ValueDeserializer::new_with(
+            value,
+            path,
+            unused_key_callback,
+            field_transformer,
+        ))
+    }
+}
+
+macro_rules! ref_mode_forward {
+    ($($method:ident($($arg:ident: $ty:ty),*);)*) => {$(
+        #[inline]
+        fn $method<V>(self, $($arg: $ty,)* visitor: V) -> Result<V::Value, Error>
+        where
+            V: Visitor<'de>,
+        {
+            let _ref_mode = set_ref_mode(true);
+            self.0.$method($($arg,)* visitor)
+        }
+    )*};
+}
+
+impl<'de> Deserializer<'de> for RefModeDeserializer<'_, '_, '_> {
+    type Error = Error;
+
+    ref_mode_forward! {
+        deserialize_any();
+        deserialize_bool();
+        deserialize_i8();
+        deserialize_i16();
+        deserialize_i32();
+        deserialize_i64();
+        deserialize_i128();
+        deserialize_u8();
+        deserialize_u16();
+        deserialize_u32();
+        deserialize_u64();
+        deserialize_u128();
+        deserialize_f32();
+        deserialize_f64();
+        deserialize_char();
+        deserialize_str();
+        deserialize_string();
+        deserialize_bytes();
+        deserialize_byte_buf();
+        deserialize_option();
+        deserialize_unit();
+        deserialize_unit_struct(name: &'static str);
+        deserialize_newtype_struct(name: &'static str);
+        deserialize_seq();
+        deserialize_tuple(len: usize);
+        deserialize_tuple_struct(name: &'static str, len: usize);
+        deserialize_map();
+        deserialize_struct(name: &'static str, fields: &'static [&'static str]);
+        deserialize_enum(name: &'static str, variants: &'static [&'static str]);
+        deserialize_identifier();
+        deserialize_ignored_any();
+    }
+}
+
 impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
     type Error = Error;
 
