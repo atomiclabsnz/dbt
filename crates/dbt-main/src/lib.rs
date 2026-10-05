@@ -1,3 +1,7 @@
+// wasm32 only: after the sqlparser 0.62 / DataFusion 55 bump, proving the
+// compile future Send/Sync (through sqlparser AST types) overflows the default 128.
+#![recursion_limit = "256"]
+
 /// Support for graceful shutdown on Ctrl+C or fail-fast trigger.
 pub mod ctrl_c;
 
