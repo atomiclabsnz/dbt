@@ -51,6 +51,8 @@ pub use query_ctx::QueryCtx;
 
 pub mod semaphore;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) mod adbc_compat;
 pub(crate) mod builder;
 pub(crate) mod checksums;
 pub(crate) mod driver_channel;
