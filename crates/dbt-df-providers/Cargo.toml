@@ -35,3 +35,8 @@ workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["fs", "net", "process", "rt-multi-thread", "signal"] }
+
+[dev-dependencies]
+# DataFusion 51+ put SessionContext::sql behind the `sql` feature; only the
+# tests issue SQL.
+datafusion = { workspace = true, features = ["parquet", "sql"] }
