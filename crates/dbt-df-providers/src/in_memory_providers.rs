@@ -5,7 +5,6 @@ use datafusion_common::error::DataFusionError;
 use dbt_frontend_common::error::InternalResult;
 use dbt_frontend_common::ident::Identifier;
 use scc::HashMap as SccHashMap;
-use std::any::Any;
 use std::sync::Arc;
 
 /// Minimal catalog list that stores everything in memory.
@@ -30,10 +29,6 @@ impl InMemoryCatalogProviderList {
 }
 
 impl CatalogProviderList for InMemoryCatalogProviderList {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn register_catalog(
         &self,
         _name: String,
@@ -64,10 +59,6 @@ pub struct InMemoryCatalogProvider {
 }
 
 impl CatalogProvider for InMemoryCatalogProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema_names(&self) -> Vec<String> {
         let mut names = Vec::new();
         self.schema_cache.iter_sync(|k, _| {
@@ -103,10 +94,6 @@ pub struct InMemorySchemaProvider {
 
 #[async_trait::async_trait]
 impl SchemaProvider for InMemorySchemaProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     /// Returns the registered table names without acquiring long-lived locks.
     fn table_names(&self) -> Vec<String> {
         let mut names = Vec::new();

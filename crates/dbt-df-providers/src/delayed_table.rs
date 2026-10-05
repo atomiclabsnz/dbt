@@ -3,13 +3,12 @@
 use datafusion::{
     datasource::listing::{ListingTable, ListingTableConfig, ListingTableUrl},
     execution::options::ReadOptions,
-    prelude::{NdJsonReadOptions, ParquetReadOptions},
+    prelude::{JsonReadOptions, ParquetReadOptions},
 };
 use datafusion_catalog::{Session, TableProvider};
 use datafusion_common::error::DataFusionError;
 use datafusion_expr::Expr;
 use dbt_schema_store::{CanonicalFqn, DataStoreTrait, SchemaStoreTrait};
-use std::any::Any;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -66,10 +65,6 @@ impl DelayedDataTableProvider {
 
 #[async_trait::async_trait]
 impl TableProvider for DelayedDataTableProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> Arc<arrow_schema::Schema> {
         let schema_entry = self
             .schema_store
@@ -167,18 +162,18 @@ async fn make_listing_table_provider(
     table_path: &Path,
     table_format: TableFormat,
 ) -> Result<Arc<ListingTable>, DataFusionError> {
-    let listing_options = match table_format {
-        TableFormat::Parquet => {
-            ParquetReadOptions::new().to_listing_options(ctx.config(), ctx.table_options().clone())
-        }
-        TableFormat::Csv => {
-            return Err(DataFusionError::Internal(
-                "TableFormat::Csv is not supported in make_listing_table_provider".to_string(),
-            ));
-        }
-        TableFormat::Json => NdJsonReadOptions::default()
-            .to_listing_options(ctx.config(), ctx.table_options().clone()),
-    };
+    let listing_options =
+        match table_format {
+            TableFormat::Parquet => ParquetReadOptions::new()
+                .to_listing_options(ctx.config(), ctx.table_options().clone()),
+            TableFormat::Csv => {
+                return Err(DataFusionError::Internal(
+                    "TableFormat::Csv is not supported in make_listing_table_provider".to_string(),
+                ));
+            }
+            TableFormat::Json => JsonReadOptions::default()
+                .to_listing_options(ctx.config(), ctx.table_options().clone()),
+        };
     let (table_path, schema) =
         infer_schema_for_listing_options(ctx, table_path, &listing_options).await?;
 

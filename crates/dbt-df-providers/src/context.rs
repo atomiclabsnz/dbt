@@ -50,7 +50,7 @@ pub fn init_session_context_with_time_zone(
 ) -> Result<SessionContext> {
     let mut config = get_default_session_config()?;
     if let Some(tz) = execution_time_zone {
-        config.options_mut().execution.time_zone = tz.to_string();
+        config.options_mut().execution.time_zone = Some(tz.to_string());
     }
     init_session_context_from_config(config, store, data_store)
 }

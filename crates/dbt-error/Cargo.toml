@@ -24,7 +24,7 @@ dbt-tracing = { workspace = true }
 
 # Core dependencies needed by error types
 arrow = { workspace = true }
-datafusion-common = { workspace = true }
+datafusion-common = { workspace = true, features = ["sql"] }
 datafusion-expr = { workspace = true }
 minijinja = { workspace = true }
 parquet = { workspace = true }

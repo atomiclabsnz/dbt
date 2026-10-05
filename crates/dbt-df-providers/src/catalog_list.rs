@@ -10,7 +10,6 @@ use dbt_frontend_common::error::InternalResult;
 use dbt_frontend_common::ident::Identifier;
 use dbt_schema_store::{CanonicalFqn, DataStoreTrait, SchemaStoreTrait};
 use scc::HashMap as SccHashMap;
-use std::any::Any;
 use std::sync::Arc;
 
 use crate::delayed_table::DelayedDataTableProvider;
@@ -52,10 +51,6 @@ impl SchemaStoreCatalogProviderList {
 }
 
 impl CatalogProviderList for SchemaStoreCatalogProviderList {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn register_catalog(
         &self,
         _name: String,
@@ -104,10 +99,6 @@ impl SchemaStoreCatalogProvider {
 }
 
 impl CatalogProvider for SchemaStoreCatalogProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema_names(&self) -> Vec<String> {
         self.store
             .schema_names(&self.catalog)
@@ -167,10 +158,6 @@ impl SchemaStoreSchemaProvider {
 
 #[async_trait::async_trait]
 impl SchemaProvider for SchemaStoreSchemaProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn table_names(&self) -> Vec<String> {
         self.store
             .table_names(&self.catalog, &self.schema)
