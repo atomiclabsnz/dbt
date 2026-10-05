@@ -863,13 +863,13 @@ impl<'de, 'u, 'f> Deserializer<'de> for ValueDeserializer<'_, 'u, 'f> {
                 self.field_transformer,
             ),
             // ref mode: the borrowed deserializer visits an empty map (no
-            // flatten keys) instead of an empty struct.
-            Value::Null(..) if ref_mode() => visitor.visit_map(&mut MapDeserializer::new(
-                Mapping::new(),
-                self.path,
-                None,
-                None,
-            )),
+            // flatten keys) instead of an empty struct. An empty struct with
+            // no known keys yields exactly that, and reuses this visitor's
+            // `visit_struct` instance rather than adding a `visit_map` one
+            // per struct type.
+            Value::Null(..) if ref_mode() => {
+                visit_struct(Mapping::new(), self.path, visitor, &[], None, None)
+            }
             Value::Null(..) => visit_struct(
                 Mapping::new(),
                 self.path,
