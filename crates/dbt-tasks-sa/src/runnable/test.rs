@@ -481,7 +481,7 @@ impl AggregatedTestRunRemoteTask {
         insert_test_run_stat(
             ctx,
             unique_id.to_string(),
-            SystemTime::now(),
+            dbt_vfs::time::system_now(),
             result.failures,
             result.status,
         );
@@ -505,7 +505,7 @@ impl Task for AggregatedTestRunRemoteTask {
         ctx: &'a mut TaskRunnerCtx,
     ) -> Pin<Box<dyn Future<Output = FsResult<NodeStatus>> + Send + 'a>> {
         Box::pin(async move {
-            let start = SystemTime::now();
+            let start = dbt_vfs::time::system_now();
             let mut spans_by_id: HashMap<_, _> = self
                 .member_tests
                 .iter()
@@ -581,7 +581,7 @@ pub fn execute_test_remote(
     ctx: &TaskRunnerCtx,
     task_result: &TaskResult,
 ) -> FsResult<NodeStatus> {
-    let start = SystemTime::now();
+    let start = dbt_vfs::time::system_now();
     let unique_id = &test.common().unique_id;
     let mut base_context = ctx.inner.base_context.clone();
 

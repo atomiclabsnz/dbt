@@ -199,16 +199,57 @@ USE_PATHEXT = "use dbt_vfs::PathExt as _;\n"
 # Test regions
 
 
-def is_test_file(rel: Path) -> bool:
-    name = rel.name
-    return (
-        "tests" in rel.parts[:-1]
-        or "test" in rel.parts[:-1]
-        or name in ("tests.rs", "test.rs", "test_utils.rs", "testing.rs")
-        or name.endswith("_tests.rs")
-        or name.endswith("_test.rs")
-        or name.startswith("test_")
+TEST_MOD = re.compile(
+    r"((?:#\[[^\]]*\]\s*)+)(?:pub(?:\([^)]*\))?\s+)?mod\s+(\w+)\s*;"
+)
+
+
+def test_module_files(src_dir: Path) -> set[Path]:
+    """The files under `src_dir` that are test code **by declaration**: the file (or
+    directory) of a module declared behind `#[cfg(test)]` (`#[cfg(test)] mod x;`).
+
+    Not by file name. Inside `src/` a name says nothing about whether the code is a
+    test: `dbt-tasks-sa/src/runnable/test.rs` is the runner of every data test, and
+    `unit_test.rs` the runner of unit tests. A name rule skipped both, so their raw
+    `SystemTime::now()` survived the rewrite and the scan, and every `dbt test`
+    trapped in a browser (ferrion #450). A file that opens with `#![cfg(test)]` is
+    test code too; `is_test_code` checks that per file.
+    """
+    out: set[Path] = set()
+    for path in src_dir.rglob("*.rs"):
+        text = path.read_text(errors="replace")
+        for m in TEST_MOD.finditer(text):
+            attrs = re.sub(r"\s+", "", m.group(1))
+            if "#[cfg(test)]" not in attrs:
+                continue
+            out |= module_paths(path, m.group(1), m.group(2))
+    return out
+
+
+def module_paths(declaring: Path, attrs: str, name: str) -> set[Path]:
+    """Where `mod <name>;` with `attrs`, declared in `declaring`, lives: a
+    `#[path = "…"]` file, relative to the declaring file's directory, or else
+    `<name>.rs` / `<name>/` beside it (beside `lib.rs`/`main.rs`/`mod.rs`, under a
+    directory named for any other file)."""
+    path_attr = re.search(r'#\[\s*path\s*=\s*"([^"]+)"\s*\]', attrs)
+    if path_attr:
+        return {declaring.parent / path_attr.group(1)}
+    base = (
+        declaring.parent
+        if declaring.name in ("lib.rs", "main.rs", "mod.rs")
+        else declaring.with_suffix("")
     )
+    return {base / f"{name}.rs", base / name}
+
+
+def is_test_code(path: Path, test_files: set[Path]) -> bool:
+    """Whether `path` is test code: declared behind `#[cfg(test)]` (in
+    `test_files`, from `test_module_files`, or below such a module's directory),
+    or opening with `#![cfg(test)]`."""
+    if path in test_files or any(parent in test_files for parent in path.parents):
+        return True
+    head = path.read_text(errors="replace")[:4096]
+    return re.search(r"#!\[\s*cfg\s*\(\s*test\s*\)\s*\]", head) is not None
 
 
 def code_mask(src: str) -> list[bool]:
@@ -435,9 +476,10 @@ def main() -> int:
     for crate in CRATES:
         src = ROOT / "crates" / crate / "src"
         touched = False
+        tests = test_module_files(src)
         for path in sorted(src.rglob("*.rs")):
             relp = path.relative_to(src)
-            if is_test_file(relp):
+            if is_test_code(path, tests):
                 continue
             rel = f"{crate}/src/{relp.as_posix()}"
             if any(rel == f for f, _why in SKIP_FILES):

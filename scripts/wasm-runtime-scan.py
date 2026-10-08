@@ -162,18 +162,6 @@ def closure() -> list[tuple[str, Path]]:
     return sorted((pkgs[p]["name"], Path(pkgs[p]["manifest_path"]).parent) for p in seen)
 
 
-def is_test_file(rel: Path) -> bool:
-    name = rel.name
-    return (
-        "tests" in rel.parts[:-1]
-        or "test" in rel.parts[:-1]
-        or name in ("tests.rs", "test.rs", "test_utils.rs", "testing.rs")
-        or name.endswith("_tests.rs")
-        or name.endswith("_test.rs")
-        or name.startswith("test_")
-    )
-
-
 def code_mask(src: str) -> list[bool]:
     """True for each char that is code (not a comment, string or char literal)."""
     n = len(src)
@@ -293,6 +281,12 @@ def gated_modules(src_dir: Path) -> set[Path]:
             if not any(excludes_wasm(a.group(1)) for a in CFG_ATTR.finditer(m.group(1))):
                 continue
             name = m.group(2)
+            # A `#[path = "…"]` module lives where it says, relative to the declaring
+            # file's directory (dbt-docs-server's `server_tests.rs`, #450).
+            path_attr = re.search(r'#\[\s*path\s*=\s*"([^"]+)"\s*\]', m.group(1))
+            if path_attr:
+                out.add(path.parent / path_attr.group(1))
+                continue
             base = path.parent if path.name in ("lib.rs", "main.rs", "mod.rs") else path.with_suffix("")
             out.add(base / f"{name}.rs")
             out.add(base / name)
@@ -328,9 +322,8 @@ def scan():
             continue
         gmods = gated_modules(src_dir)
         for path in sorted(src_dir.rglob("*.rs")):
-            relp = path.relative_to(src_dir)
-            if is_test_file(relp):
-                continue
+            # No skipping by file name (#450): `runnable/test.rs` is production code.
+            # Test code is excluded by its `cfg(test)` gate, as every other gate is.
             src = path.read_text(errors="replace")
             if not any(p.search(src) for _k, p in KINDS):
                 continue

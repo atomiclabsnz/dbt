@@ -79,7 +79,7 @@ fn default_entrypoint(driver_path: impl AsRef<OsStr>) -> String {
         .find('.')
         .map_or_else(|| filename, |pos| &filename[..pos]);
     let name = basename
-        .strip_prefix(std::env::consts::DLL_PREFIX)
+        .strip_prefix(dbt_vfs::env::consts::DLL_PREFIX)
         .unwrap_or(basename);
     default_entrypoint_from_name(name)
 }

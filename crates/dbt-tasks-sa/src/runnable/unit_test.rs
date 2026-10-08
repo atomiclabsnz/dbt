@@ -29,7 +29,7 @@ pub fn execute_unit_test_remote(
     ctx: &TaskRunnerCtx,
     task_result: &TaskResult,
 ) -> FsResult<(NodeStatus, Option<UnitTestExecutionResult>)> {
-    let start = SystemTime::now();
+    let start = dbt_vfs::time::system_now();
     let mut base_context = ctx.inner.base_context.clone();
     let unique_id = &unit_test.common().unique_id;
 
@@ -119,7 +119,7 @@ fn execute_unit_test_remote_inner(
 
             let node_status = NodeStatus::Errored;
             let thread_id = ctx.thread_id;
-            let start = SystemTime::now();
+            let start = dbt_vfs::time::system_now();
 
             // Add stats for this test
             ctx.inner.run_stats.insert(

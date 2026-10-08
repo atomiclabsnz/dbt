@@ -520,9 +520,10 @@ def main() -> int:
         if not src_dir.is_dir():
             continue
         touched = False
+        tests = vfs.test_module_files(src_dir)
         for path in sorted(src_dir.rglob("*.rs")):
             relp = path.relative_to(src_dir)
-            if vfs.is_test_file(relp):
+            if vfs.is_test_code(path, tests):
                 continue
             rel = path.relative_to(crates_root).as_posix()
             if any(rel == f for f, _why in SKIP_FILES):
