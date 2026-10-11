@@ -29,6 +29,7 @@
 //! startup — capability detection is the job of [`Backend::table_has_rows`].
 
 use arrow_array::RecordBatch;
+use dbt_vfs::PathExt as _;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BackendError {
@@ -93,7 +94,7 @@ pub struct DuckDbViewsBackend {
 
 impl DuckDbViewsBackend {
     pub fn open(index_dir: &Path) -> Result<Self, BackendError> {
-        if !index_dir.exists() {
+        if !index_dir.vfs_exists() {
             return Err(BackendError::Query(format!(
                 "index directory does not exist: {}\n\n\
                  Run `dbt --write-index <run|build|compile>` to generate parquet artifacts, \
@@ -147,7 +148,8 @@ fn register_views(db: &mut Db, index_dir: &Path) -> Result<(), BackendError> {
     db.execute_update("CREATE SCHEMA IF NOT EXISTS dbt_rt")
         .map_err(|e| BackendError::Query(e.to_string()))?;
 
-    let entries = std::fs::read_dir(index_dir).map_err(|e| BackendError::Query(e.to_string()))?;
+    let entries =
+        dbt_vfs::fs::read_dir(index_dir).map_err(|e| BackendError::Query(e.to_string()))?;
     for entry in entries {
         let entry = entry.map_err(|e| BackendError::Query(e.to_string()))?;
         let path = entry.path();

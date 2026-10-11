@@ -172,7 +172,7 @@ pub fn export_site(
 /// contents, so a self-contained site and an in-place one read the same contract.
 fn copy_index(index_dir: &Path, dest_dir: &Path) -> Result<usize, ExportError> {
     create_dir_all(dest_dir)?;
-    let entries = std::fs::read_dir(index_dir).map_err(|source| ExportError::Io {
+    let entries = dbt_vfs::fs::read_dir(index_dir).map_err(|source| ExportError::Io {
         path: index_dir.to_path_buf(),
         source,
     })?;
@@ -187,7 +187,7 @@ fn copy_index(index_dir: &Path, dest_dir: &Path) -> Result<usize, ExportError> {
             continue;
         };
         let dest = dest_dir.join(name);
-        std::fs::copy(&path, &dest).map_err(|source| ExportError::Io { path: dest, source })?;
+        dbt_vfs::fs::copy(&path, &dest).map_err(|source| ExportError::Io { path: dest, source })?;
         copied += 1;
     }
     Ok(copied)
@@ -202,7 +202,7 @@ fn index_has_column_lineage(index_dir: &Path) -> bool {
     let path = index_dir.join("dbt.column_lineage.parquet");
     // A parquet holding only a schema is a few hundred bytes; one holding edges is
     // not. Cheaper than opening the file, and only drives a progress message.
-    std::fs::metadata(&path).is_ok_and(|m| m.len() > 2_048)
+    dbt_vfs::fs::metadata(&path).is_ok_and(|m| m.len() > 2_048)
 }
 
 /// Copy the embedded SPA out, injecting the bootstrap into `index.html`.
@@ -221,9 +221,9 @@ fn write_spa(options: &ExportOptions, providers: &Providers) -> Result<(), Expor
         let result = if path == "index.html" {
             wrote_index = true;
             let injected = bootstrap.inject(&String::from_utf8_lossy(&bytes));
-            std::fs::write(&dest, injected)
+            dbt_vfs::fs::write(&dest, injected)
         } else {
-            std::fs::write(&dest, &bytes)
+            dbt_vfs::fs::write(&dest, &bytes)
         };
         result.map_err(|source| ExportError::Io { path: dest, source })?;
     }
@@ -245,7 +245,7 @@ fn write_spa(_options: &ExportOptions, _providers: &Providers) -> Result<(), Exp
 /// signal that there is something to export. Public so callers can check before
 /// paying to open a backend, and report [`ExportError::NoIndex`] themselves.
 pub fn index_dir_has_artifacts(dir: &Path) -> bool {
-    let Ok(entries) = std::fs::read_dir(dir) else {
+    let Ok(entries) = dbt_vfs::fs::read_dir(dir) else {
         return false;
     };
     entries.flatten().any(|entry| {
@@ -257,7 +257,7 @@ pub fn index_dir_has_artifacts(dir: &Path) -> bool {
 }
 
 fn create_dir_all(path: &Path) -> Result<(), ExportError> {
-    std::fs::create_dir_all(path).map_err(|source| ExportError::Io {
+    dbt_vfs::fs::create_dir_all(path).map_err(|source| ExportError::Io {
         path: path.to_path_buf(),
         source,
     })

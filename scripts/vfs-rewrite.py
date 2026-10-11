@@ -57,7 +57,11 @@ CRATES = [
     "dbt-csv",
     "dbt-deps",
     "dbt-df-providers",
+    # ferrion #520: `dbt docs generate` writes the parquet index (`dbt-index-core`)
+    # and copies it into the exported site (`dbt-docs-server`'s export).
+    "dbt-docs-server",
     "dbt-error",
+    "dbt-index-core",
     "dbt-jinja-ctx",
     "dbt-jinja-utils",
     "dbt-loader",

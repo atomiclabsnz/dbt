@@ -8,6 +8,7 @@
 //! Speed: parquet→parquet with Arrow = no SQL parse/exec overhead.
 //! Expected: ~200ms cold for 6k nodes vs 4.5s through DuckDB ADBC.
 
+use dbt_vfs::PathExt as _;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::time::{Duration, UNIX_EPOCH};
@@ -94,12 +95,12 @@ pub fn save_state(index_dir: &Path, state: &IngestState) {
         base_mtime_us,
     };
     if let Ok(json) = serde_json::to_string(&ps) {
-        let _ = std::fs::write(index_dir.join(STATE_FILE), json);
+        let _ = dbt_vfs::fs::write(index_dir.join(STATE_FILE), json);
     }
 }
 
 pub fn load_state(index_dir: &Path) -> Option<IngestState> {
-    let bytes = std::fs::read(index_dir.join(STATE_FILE)).ok()?;
+    let bytes = dbt_vfs::fs::read(index_dir.join(STATE_FILE)).ok()?;
     let ps: PersistedState = serde_json::from_slice(&bytes).ok()?;
 
     let alive_mtime = ps
@@ -231,7 +232,7 @@ fn cold_ingest(
     writer.finish_for_ingest()?;
 
     // Store at µs precision to match what save_state serializes.
-    let alive_us: Option<u64> = std::fs::metadata(metadata_dir.join(PARSE_ALIVE))
+    let alive_us: Option<u64> = dbt_vfs::fs::metadata(metadata_dir.join(PARSE_ALIVE))
         .ok()
         .and_then(|m| m.modified().ok())
         .and_then(mtime_us);
@@ -248,7 +249,7 @@ pub fn apply_delta_direct(
     state: &mut IngestState,
 ) -> Result<usize, IndexError> {
     // Compare at microsecond precision — state is persisted as µs, OS mtime is ns.
-    let current_us: Option<u64> = std::fs::metadata(metadata_dir.join(PARSE_ALIVE))
+    let current_us: Option<u64> = dbt_vfs::fs::metadata(metadata_dir.join(PARSE_ALIVE))
         .ok()
         .and_then(|m| m.modified().ok())
         .and_then(mtime_us);
@@ -343,7 +344,7 @@ pub fn has_unseen_compile_epochs(metadata_dir: &Path, state: &IngestState) -> bo
     ];
     for &subdir in COMPILE_SUBDIRS {
         let dir = metadata_dir.join(subdir);
-        if !dir.exists() {
+        if !dir.vfs_exists() {
             continue;
         }
         if state.base_differs(subdir, &dir) {
@@ -377,7 +378,7 @@ pub fn read_parquet_batches_proj(
     path: &Path,
     cols: &[&str],
 ) -> Result<Vec<arrow_array::RecordBatch>, IndexError> {
-    let file = std::fs::File::open(path)?;
+    let file = dbt_vfs::fs::File::open(path)?;
     let builder = ParquetRecordBatchReaderBuilder::try_new(file)
         .map_err(|e| IndexError::Other(format!("parquet open {}: {e}", path.display())))?;
     let builder = builder.with_batch_size(65536);
@@ -596,7 +597,7 @@ pub type CompileMap = HashMap<String, CompileFields>;
 /// Load alive.parquet → set of live unique_ids (None if file absent).
 pub fn load_alive_ids(metadata_dir: &Path) -> Option<HashSet<String>> {
     let path = metadata_dir.join(PARSE_ALIVE);
-    if !path.exists() {
+    if !path.vfs_exists() {
         return None;
     }
     let batches = read_parquet_batches_proj(&path, &["unique_id"]).ok()?;
@@ -634,7 +635,7 @@ pub fn load_compile_nodes_map(
     full: bool,
 ) -> Result<CompileMap, IndexError> {
     let dir = metadata_dir.join(COMPILE_NODES_SUBDIR);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return Ok(CompileMap::new());
     }
 
@@ -777,7 +778,7 @@ fn write_parse_nodes(
     alive_ids: Option<&HashSet<String>>,
 ) -> Result<usize, IndexError> {
     let dir = metadata_dir.join(PARSE_NODES_SUBDIR);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return Ok(0);
     }
 
@@ -1736,7 +1737,7 @@ fn write_parse_columns(
     alive_ids: Option<&HashSet<String>>,
 ) -> Result<usize, IndexError> {
     let dir = metadata_dir.join(PARSE_COLUMNS_SUBDIR);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return Ok(0);
     }
 
@@ -1852,7 +1853,7 @@ fn write_parse_project(
     }
 
     let gen_path = metadata_dir.join(PARSE_GENERATION);
-    if gen_path.exists() {
+    if gen_path.vfs_exists() {
         let batches = read_parquet_batches(&gen_path)?;
         for batch in &batches {
             if project_name.is_empty() {
@@ -1884,7 +1885,7 @@ fn write_parse_project(
     // ── Legacy fallback: parse/project.parquet (retired KV store, pre-#10600) ──
     if project_name.is_empty() {
         let legacy_path = metadata_dir.join(PARSE_PROJECT);
-        if legacy_path.exists() {
+        if legacy_path.vfs_exists() {
             let batches = read_parquet_batches(&legacy_path)?;
             let mut kv: HashMap<String, String> = HashMap::new();
             for batch in &batches {
@@ -1918,7 +1919,7 @@ fn write_parse_project(
     let mut git_is_dirty: Option<bool> = None;
 
     let rs_path = metadata_dir.join(PARSE_RESOLVER_STATE);
-    if rs_path.exists() {
+    if rs_path.vfs_exists() {
         let batches = read_parquet_batches(&rs_path)?;
         for batch in &batches {
             // vars_json / env_vars_json: fall back to resolver_state for metadata
@@ -2008,7 +2009,7 @@ fn write_parse_generation(
     now: &str,
 ) -> Result<usize, IndexError> {
     let path = metadata_dir.join(PARSE_GENERATION);
-    if !path.exists() {
+    if !path.vfs_exists() {
         return Ok(0);
     }
 
@@ -2045,7 +2046,7 @@ fn write_compile_columns(
     alive_ids: Option<&HashSet<String>>,
 ) -> Result<usize, IndexError> {
     let dir = metadata_dir.join(COMPILE_COLUMNS_SUBDIR);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return Ok(0);
     }
 
@@ -2143,7 +2144,7 @@ fn write_catalog_columns(
     alive_ids: Option<&HashSet<String>>,
 ) -> Result<usize, IndexError> {
     let dir = metadata_dir.join(CATALOG_COLUMNS_SUBDIR);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return Ok(0);
     }
 
@@ -2542,7 +2543,7 @@ fn write_compile_cll(
     alive_ids: Option<&HashSet<String>>,
 ) -> Result<usize, IndexError> {
     let dir = metadata_dir.join(COMPILE_CLL_SUBDIR);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return Ok(0);
     }
 
@@ -2667,7 +2668,7 @@ fn write_run_invocations(
     }
 
     let dir = metadata_dir.join(RUN_INVOCATIONS_SUBDIR);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return Ok(0);
     }
 
@@ -2764,7 +2765,7 @@ fn write_run_results(
     }
 
     let dir = metadata_dir.join(RUN_RESULTS_SUBDIR);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return Ok(0);
     }
 
@@ -2842,7 +2843,7 @@ fn write_run_freshness(
     full: bool,
 ) -> Result<usize, IndexError> {
     let dir = metadata_dir.join(RUN_FRESHNESS_SUBDIR);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return Ok(0);
     }
 
@@ -2924,7 +2925,7 @@ fn write_column_stats(
 ) -> Result<usize, IndexError> {
     let rr_path = index_dir.join("dbt_rt.run_results.parquet");
     let nc_path = index_dir.join("dbt.node_columns.parquet");
-    if !rr_path.exists() || !nc_path.exists() {
+    if !rr_path.vfs_exists() || !nc_path.vfs_exists() {
         return Ok(0);
     }
 
@@ -3000,12 +3001,12 @@ fn write_seed_catalog_stats(
     now: &str,
 ) -> Result<usize, IndexError> {
     let nodes_path = index_dir.join("dbt.nodes.parquet");
-    if !nodes_path.exists() {
+    if !nodes_path.vfs_exists() {
         return Ok(0);
     }
     let target_dir = metadata_dir.parent().unwrap_or(metadata_dir);
     let data_dir = target_dir.join("data");
-    if !data_dir.exists() {
+    if !data_dir.vfs_exists() {
         return Ok(0);
     }
 
@@ -3040,7 +3041,7 @@ fn write_seed_catalog_stats(
                 .join(parts[1])
                 .join(parts[2])
                 .join("output.parquet");
-            if !data_path.exists() {
+            if !data_path.vfs_exists() {
                 continue;
             }
 
@@ -3091,7 +3092,7 @@ fn write_warehouse_catalog_stats(
     full: bool,
 ) -> Result<usize, IndexError> {
     let dir = metadata_dir.join(RUN_CATALOG_STATS_SUBDIR);
-    if !dir.exists() {
+    if !dir.vfs_exists() {
         return Ok(0);
     }
 

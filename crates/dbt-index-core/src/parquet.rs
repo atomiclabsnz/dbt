@@ -4,6 +4,7 @@
 //! directly into Arrow `RecordBatch`es, then writes them via `ArrowWriter` with
 //! ZSTD compression. No DuckDB driver, no SQL strings, no JSON file I/O.
 
+use dbt_vfs::PathExt as _;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
@@ -43,10 +44,10 @@ fn write_table_items<T: serde::Serialize>(
     items: &[T],
 ) -> Result<(), IndexError> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+        dbt_vfs::fs::create_dir_all(parent)?;
     }
     let tmp = path.with_extension("parquet.tmp");
-    let file = std::fs::File::create(&tmp)?;
+    let file = dbt_vfs::fs::File::create(&tmp)?;
     let props = WriterProperties::builder()
         .set_compression(Compression::ZSTD(ZstdLevel::try_new(1).unwrap())) // fastest ZSTD; ~same size as level 3 at this scale
         .build();
@@ -67,7 +68,7 @@ fn write_table_items<T: serde::Serialize>(
     writer
         .close()
         .map_err(|e| IndexError::Other(format!("ArrowWriter close: {e}")))?;
-    std::fs::rename(&tmp, path)?;
+    dbt_vfs::fs::rename(&tmp, path)?;
     Ok(())
 }
 
@@ -79,10 +80,10 @@ fn write_table_items_typed<T: serde::Serialize>(
     items: &[T],
 ) -> Result<(), IndexError> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+        dbt_vfs::fs::create_dir_all(parent)?;
     }
     let tmp = path.with_extension("parquet.tmp");
-    let file = std::fs::File::create(&tmp)?;
+    let file = dbt_vfs::fs::File::create(&tmp)?;
     let props = WriterProperties::builder()
         .set_compression(Compression::ZSTD(ZstdLevel::try_new(1).unwrap()))
         .build();
@@ -99,7 +100,7 @@ fn write_table_items_typed<T: serde::Serialize>(
     writer
         .close()
         .map_err(|e| IndexError::Other(format!("ArrowWriter close: {e}")))?;
-    std::fs::rename(&tmp, path)?;
+    dbt_vfs::fs::rename(&tmp, path)?;
     Ok(())
 }
 
@@ -179,15 +180,15 @@ pub fn merge_prune_arrow(
 
     // Write to a temp file, then rename atomically.
     let tmp = path.with_extension("parquet.tmp");
-    let file = std::fs::File::create(&tmp)?;
+    let file = dbt_vfs::fs::File::create(&tmp)?;
     let mut writer = ArrowWriter::try_new(file, schema, Some(props))
         .map_err(|e| IndexError::Other(format!("ArrowWriter: {e}")))?;
 
     let mut total = 0usize;
 
     // Pass 1: old rows, minus those being replaced.
-    if path.exists() {
-        let old_file = std::fs::File::open(path)?;
+    if path.vfs_exists() {
+        let old_file = dbt_vfs::fs::File::open(path)?;
         if let Ok(builder) = ParquetRecordBatchReaderBuilder::try_new(old_file) {
             let key_idx = builder.schema().index_of(key_col).ok();
             if let Ok(reader) = builder.build() {
@@ -235,15 +236,15 @@ pub fn merge_prune_arrow(
     writer
         .close()
         .map_err(|e| IndexError::Other(format!("close: {e}")))?;
-    std::fs::rename(&tmp, path)?;
+    dbt_vfs::fs::rename(&tmp, path)?;
     Ok(total)
 }
 
 fn read_parquet_rows(path: &Path) -> Result<Option<Vec<Map<String, Value>>>, IndexError> {
-    if !path.exists() {
+    if !path.vfs_exists() {
         return Ok(None);
     }
-    let file = std::fs::File::open(path)?;
+    let file = dbt_vfs::fs::File::open(path)?;
     let builder = match ParquetRecordBatchReaderBuilder::try_new(file) {
         Ok(b) => b,
         Err(_) => return Ok(None),
@@ -601,7 +602,7 @@ pub struct IndexWriter {
 
 impl IndexWriter {
     pub fn new(index_dir: &Path) -> Result<Self, IndexError> {
-        std::fs::create_dir_all(index_dir)?;
+        dbt_vfs::fs::create_dir_all(index_dir)?;
         Ok(Self {
             index_dir: index_dir.to_path_buf(),
             now: chrono::Utc::now().to_rfc3339(),
@@ -799,13 +800,13 @@ impl IndexWriter {
         let schema = schema_for(table);
         let path = self.index_dir.join(format!("dbt.{table}.parquet"));
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
+            dbt_vfs::fs::create_dir_all(parent)?;
         }
         let tmp = path.with_extension("parquet.tmp");
         let props = WriterProperties::builder()
             .set_compression(Compression::ZSTD(ZstdLevel::try_new(1).unwrap()))
             .build();
-        let file = std::fs::File::create(&tmp)?;
+        let file = dbt_vfs::fs::File::create(&tmp)?;
         let mut writer = ArrowWriter::try_new(file, schema, Some(props))
             .map_err(|e| IndexError::Other(format!("ArrowWriter: {e}")))?;
         for batch in batches {
@@ -816,7 +817,7 @@ impl IndexWriter {
         writer
             .close()
             .map_err(|e| IndexError::Other(format!("ArrowWriter close: {e}")))?;
-        std::fs::rename(&tmp, &path)?;
+        dbt_vfs::fs::rename(&tmp, &path)?;
         self.count += 1;
         Ok(())
     }
@@ -835,12 +836,12 @@ impl IndexWriter {
             .set_compression(Compression::ZSTD(ZstdLevel::try_new(1).unwrap()))
             .build();
         let tmp = path.with_extension("parquet.tmp");
-        let file = std::fs::File::create(&tmp)?;
+        let file = dbt_vfs::fs::File::create(&tmp)?;
         let mut writer = ArrowWriter::try_new(file, schema, Some(props))
             .map_err(|e| IndexError::Other(format!("ArrowWriter: {e}")))?;
         // Pass 1: old rows minus drop_keys
-        if path.exists() {
-            let old_file = std::fs::File::open(&path)?;
+        if path.vfs_exists() {
+            let old_file = dbt_vfs::fs::File::open(&path)?;
             if let Ok(builder) = ParquetRecordBatchReaderBuilder::try_new(old_file) {
                 let key_idx = builder.schema().index_of(key_col).ok();
                 if let Ok(reader) = builder.build() {
@@ -883,7 +884,7 @@ impl IndexWriter {
         writer
             .close()
             .map_err(|e| IndexError::Other(format!("close: {e}")))?;
-        std::fs::rename(&tmp, &path)?;
+        dbt_vfs::fs::rename(&tmp, &path)?;
         self.count += 1;
         Ok(())
     }
@@ -1219,7 +1220,7 @@ impl IndexWriter {
     pub fn ensure_dbt_tables(&mut self) -> Result<(), IndexError> {
         for table in DBT_TABLES {
             let path = self.index_dir.join(format!("dbt.{table}.parquet"));
-            if !path.exists() {
+            if !path.vfs_exists() {
                 let schema = schema_for(table);
                 write_table_items::<Value>(&path, schema, &[])?;
             }
@@ -1231,7 +1232,7 @@ impl IndexWriter {
     pub fn ensure_rt_tables(&mut self) -> Result<(), IndexError> {
         for table in DBT_RT_TABLES {
             let path = self.index_dir.join(format!("dbt_rt.{table}.parquet"));
-            if !path.exists() {
+            if !path.vfs_exists() {
                 let schema = schema_for(table);
                 write_table_items::<Value>(&path, schema, &[])?;
             }

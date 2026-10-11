@@ -130,7 +130,7 @@ pub(crate) fn not_found() -> Response {
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn serve_site_dir(site_dir: &Path, uri: Uri) -> Response {
     if let Some(path) = resolve_within(site_dir, uri.path())
-        && let Ok(bytes) = tokio::fs::read(&path).await
+        && let Ok(bytes) = dbt_vfs::tokio_fs::read(&path).await
     {
         return asset_response(&path.to_string_lossy(), bytes, None);
     }
@@ -140,7 +140,7 @@ pub async fn serve_site_dir(site_dir: &Path, uri: Uri) -> Response {
     }
 
     let index = site_dir.join("index.html");
-    if let Ok(bytes) = tokio::fs::read(&index).await {
+    if let Ok(bytes) = dbt_vfs::tokio_fs::read(&index).await {
         return asset_response("index.html", bytes, None);
     }
 

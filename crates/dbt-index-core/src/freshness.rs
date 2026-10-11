@@ -4,6 +4,7 @@
 // subsequent commands can detect when artifacts have changed on disk and
 // automatically re-ingest before serving stale data.
 
+use dbt_vfs::PathExt as _;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -58,7 +59,7 @@ pub struct ArtifactMeta {
 }
 
 pub fn fingerprint_file(path: &Path) -> Option<FileFingerprint> {
-    let meta = std::fs::metadata(path).ok()?;
+    let meta = dbt_vfs::fs::metadata(path).ok()?;
     let modified_secs = meta
         .modified()
         .ok()?
@@ -83,7 +84,7 @@ pub fn compute_fingerprints(target_dir: &Path) -> HashMap<String, FileFingerprin
 
 pub fn compute_context_fingerprints(context_dir: &Path) -> HashMap<String, FileFingerprint> {
     let mut fps = HashMap::new();
-    if context_dir.is_dir() {
+    if context_dir.vfs_is_dir() {
         collect_md_fingerprints(context_dir, context_dir, &mut fps);
     }
     fps
@@ -94,12 +95,12 @@ pub fn collect_md_fingerprints(
     dir: &Path,
     out: &mut HashMap<String, FileFingerprint>,
 ) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
+    let Ok(entries) = dbt_vfs::fs::read_dir(dir) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        if path.vfs_is_dir() {
             collect_md_fingerprints(base, &path, out);
         } else if path.extension().is_some_and(|e| e == "md") {
             if let Some(fp) = fingerprint_file(&path) {
@@ -128,7 +129,7 @@ pub fn save_artifact_meta(
     context_dir: Option<&Path>,
 ) -> Result<(), ArtifactMetaError> {
     let fingerprints = compute_fingerprints(target_dir);
-    let (ctx_dir_str, ctx_fps) = match context_dir.filter(|p| p.is_dir()) {
+    let (ctx_dir_str, ctx_fps) = match context_dir.filter(|p| p.vfs_is_dir()) {
         Some(d) => (
             Some(d.to_string_lossy().into_owned()),
             compute_context_fingerprints(d),
@@ -143,6 +144,6 @@ pub fn save_artifact_meta(
         context_fingerprints: ctx_fps,
     };
     let json = serde_json::to_string_pretty(&meta)?;
-    std::fs::write(index_dir.join(META_FILE), json)?;
+    dbt_vfs::fs::write(index_dir.join(META_FILE), json)?;
     Ok(())
 }

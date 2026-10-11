@@ -92,7 +92,7 @@ pub fn write_views_sql(dir: &Path) -> Result<(), IndexError> {
     // Analytical views
     sql.push_str(ANALYTICAL_VIEWS);
 
-    std::fs::write(dir.join("views.sql"), sql)?;
+    dbt_vfs::fs::write(dir.join("views.sql"), sql)?;
     Ok(())
 }
 

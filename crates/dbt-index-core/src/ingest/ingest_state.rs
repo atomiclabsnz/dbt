@@ -95,7 +95,7 @@ impl IngestState {
     ///
     /// Compares at microsecond precision — persisted state is µs, OS mtime is ns.
     fn base_mtime_diff(&self, subdir: &'static str, dir: &Path) -> Option<(SystemTime, bool)> {
-        let current = std::fs::metadata(dir.join(epoch_layers::base_epoch_filename()))
+        let current = dbt_vfs::fs::metadata(dir.join(epoch_layers::base_epoch_filename()))
             .and_then(|m| m.modified())
             .ok()?;
         let stored = self.base_mtime.get(subdir).copied().and_then(mtime_us);

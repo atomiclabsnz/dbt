@@ -12,7 +12,7 @@ pub fn base_epoch_filename() -> String {
 
 /// List epoch files matching `{SCHEMA_VERSION}_{N}.parquet` in `dir`, sorted ascending.
 pub fn existing_epochs(dir: &Path) -> Vec<(u32, PathBuf)> {
-    let Ok(rd) = std::fs::read_dir(dir) else {
+    let Ok(rd) = dbt_vfs::fs::read_dir(dir) else {
         return Vec::new();
     };
     let prefix = format!("{SCHEMA_VERSION}_");

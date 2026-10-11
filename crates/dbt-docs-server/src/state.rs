@@ -51,7 +51,7 @@ impl AppState {
     /// `true` when `dir` is a directory holding at least one `*.parquet`
     /// file directly. Returns `false` on any IO error or missing dir.
     fn compute_project_loaded(dir: &Path) -> bool {
-        let Ok(entries) = std::fs::read_dir(dir) else {
+        let Ok(entries) = dbt_vfs::fs::read_dir(dir) else {
             return false;
         };
         entries.flatten().any(|entry| {
@@ -65,7 +65,7 @@ impl AppState {
     /// RFC3339 timestamp of `dir`'s modified time (seconds precision, `Z`
     /// suffix), or `None` when the mtime is unavailable.
     fn compute_generation(dir: &Path) -> Option<String> {
-        let modified = std::fs::metadata(dir).ok()?.modified().ok()?;
+        let modified = dbt_vfs::fs::metadata(dir).ok()?.modified().ok()?;
         let dt: DateTime<Utc> = modified.into();
         Some(dt.to_rfc3339_opts(SecondsFormat::Secs, true))
     }
