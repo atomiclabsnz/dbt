@@ -288,6 +288,16 @@ pub async fn resolve_seeds(
 
             properties_config.column_types = Some(column_types);
         }
+        // ferrion (#486): a DuckDB seed keeps its CSV header's spelling unless it says
+        // `quote_columns: false`. DuckDB stores an unquoted column as written and
+        // matches it in any case, so under dbt-duckdb `"orderID"` and `orderid` both
+        // name a seed's `orderID`; on an engine that folds an unquoted name, the
+        // spelling survives only quoted. Set on the config, not only the seed's
+        // attributes: the seed macros quote by `config.quote_columns`, and the column
+        // names dbt reads the CSV with follow the attribute.
+        if matches!(adapter_type, AdapterType::DuckDB) && properties_config.quote_columns.is_none() {
+            properties_config.quote_columns = Some(true);
+        }
         let is_enabled = properties_config.enabled;
 
         let columns = process_columns(
