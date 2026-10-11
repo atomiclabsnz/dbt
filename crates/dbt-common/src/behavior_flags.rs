@@ -120,6 +120,20 @@ impl Behavior {
         }
         Self { flags }
     }
+
+    /// These flags and `flag` — for a host that declares a flag of its own (ferrion #512:
+    /// whether its engine writes a keyed incremental onto the matched rows), which its
+    /// macros read as `adapter.behavior.<name>`. A flag of the same name is replaced.
+    pub fn with_flag(&self, flag: BehaviorFlag) -> Self {
+        let mut flags: Vec<BehaviorFlag> = self
+            .flags
+            .iter()
+            .filter(|f| f.name != flag.name)
+            .cloned()
+            .collect();
+        flags.push(flag);
+        Self { flags }
+    }
 }
 
 impl Object for Behavior {
