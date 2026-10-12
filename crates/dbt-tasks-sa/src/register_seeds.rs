@@ -381,8 +381,10 @@ fn refuse_folded_collisions(seed: &DbtSeed, source: &Schema, folded: &Schema) ->
     match header_collision(source, folded) {
         None => Ok(()),
         Some((first, second, name)) => {
-            let how = if first.trim() == second.trim() {
-                "once their names are trimmed".to_string()
+            let how = if first == second {
+                "appear twice in the header; rename one".to_string()
+            } else if first.trim() == second.trim() {
+                "once their names are trimmed; rename one in the header".to_string()
             } else {
                 "once their names are folded (quote_columns: false); rename one in the \
                  header, or quote the columns"
@@ -390,11 +392,15 @@ fn refuse_folded_collisions(seed: &DbtSeed, source: &Schema, folded: &Schema) ->
             };
             Err(fs_err!(
                 ErrorCode::InvalidConfig,
-                "seed {}: columns {:?} and {:?} are both {:?} {how}",
+                "seed {}: columns {:?} and {:?} {}",
                 seed.__common_attr__.name,
                 first,
                 second,
-                name
+                if first == second {
+                    how
+                } else {
+                    format!("are both {name:?} {how}")
+                }
             ))
         }
     }
@@ -450,6 +456,12 @@ mod folded_collision_tests {
         let source = schema(&["Id", "ID"]);
         let verbatim = adapt_schema(source.clone(), InferColumnNameStrategy::Verbatim);
         assert_eq!(header_collision(&source, &verbatim), None);
+        let twice = schema(&["id", "id"]);
+        let kept = adapt_schema(twice.clone(), InferColumnNameStrategy::Verbatim);
+        assert_eq!(
+            header_collision(&twice, &kept),
+            Some(("id".into(), "id".into(), "id".into()))
+        );
         let padded = schema(&["id", " id"]);
         let trimmed = adapt_schema(padded.clone(), InferColumnNameStrategy::Verbatim);
         assert_eq!(
