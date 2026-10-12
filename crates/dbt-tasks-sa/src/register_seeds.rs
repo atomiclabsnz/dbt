@@ -205,7 +205,7 @@ pub async fn pre_register_seeds(
     data_store: Arc<dyn DataStoreTrait>,
     type_ops: Arc<dyn TypeOps>,
     in_dir: &Path,
-) -> Vec<RegisteredSeed> {
+) -> FsResult<Vec<RegisteredSeed>> {
     let ctx = Arc::new(SeedRegistrationCtx {
         adapter_type,
         schema_cache,
@@ -271,13 +271,22 @@ pub async fn pre_register_seeds(
             // Emit the real error here (CSV parse failure, etc.). The seed's
             // visit_render will detect the missing schema and mark the task as
             // failed without emitting a second error.
+            // A header that collides once adapted (#533) fails the run, so its reason is
+            // the run's error, and no schema an earlier run registered for the seed can
+            // stand in for the refused one.
+            Ok(Err(e))
+                if e.code == ErrorCode::InvalidCsvFormat
+                    && e.to_string().contains("rename one") =>
+            {
+                return Err(e);
+            }
             Ok(Err(e)) => tracing::error!("{}", e),
             Err(join_err) => {
                 tracing::error!("Seed registration task panicked: {}", join_err)
             }
         }
     }
-    results
+    Ok(results)
 }
 
 fn parse_provided_types(
@@ -380,30 +389,27 @@ pub fn dialect_adapted_schema(
 fn refuse_folded_collisions(seed: &DbtSeed, source: &Schema, folded: &Schema) -> FsResult<()> {
     match header_collision(source, folded) {
         None => Ok(()),
-        Some((first, second, name)) => {
-            let how = if first == second {
-                "appear twice in the header; rename one".to_string()
-            } else if first.trim() == second.trim() {
-                "once their names are trimmed; rename one in the header".to_string()
-            } else {
-                "once their names are folded (quote_columns: false); rename one in the \
-                 header, or quote the columns"
-                    .to_string()
-            };
-            Err(fs_err!(
-                ErrorCode::InvalidConfig,
-                "seed {}: columns {:?} and {:?} {}",
-                seed.__common_attr__.name,
-                first,
-                second,
-                if first == second {
-                    how
-                } else {
-                    format!("are both {name:?} {how}")
-                }
-            ))
-        }
+        Some((first, second, name)) => Err(fs_err!(
+            ErrorCode::InvalidCsvFormat,
+            "seed {}: {}",
+            seed.__common_attr__.name,
+            collision_message(&first, &second, &name)
+        )),
     }
+}
+
+/// What a header collision is, said by what made the two names one, and the one fix
+/// that works whatever `quote_columns` says: rename one (quoting a case pair is refused
+/// too, as DuckDB refuses it).
+fn collision_message(first: &str, second: &str, name: &str) -> String {
+    let how = if first == second {
+        return format!("column {first:?} appears twice in the header; rename one");
+    } else if first.trim() == second.trim() {
+        "once their names are trimmed"
+    } else {
+        "once their names are folded (quote_columns: false)"
+    };
+    format!("columns {first:?} and {second:?} are both {name:?} {how}; rename one in the header")
 }
 
 /// The first two header names the adapted schema gives one name: (first, second, name).
@@ -448,6 +454,24 @@ mod folded_collision_tests {
         assert_eq!(
             header_collision(&source, &upper),
             Some(("Id".into(), "ID".into(), "ID".into()))
+        );
+    }
+
+    #[test]
+    fn the_message_says_what_made_the_names_one() {
+        assert_eq!(
+            collision_message("Id", "ID", "id"),
+            "columns \"Id\" and \"ID\" are both \"id\" once their names are folded \
+             (quote_columns: false); rename one in the header"
+        );
+        assert_eq!(
+            collision_message("id", " id", "id"),
+            "columns \"id\" and \" id\" are both \"id\" once their names are trimmed; \
+             rename one in the header"
+        );
+        assert_eq!(
+            collision_message("id", "id", "id"),
+            "column \"id\" appears twice in the header; rename one"
         );
     }
 

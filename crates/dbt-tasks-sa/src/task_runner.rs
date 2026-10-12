@@ -155,7 +155,7 @@ impl TaskRunner {
             Arc::clone(self.adapter.engine().type_ops()),
             &run_task_args.io.in_dir,
         )
-        .await;
+        .await?;
 
         Ok(())
     }
