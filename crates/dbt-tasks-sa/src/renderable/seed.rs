@@ -1,8 +1,8 @@
 /// Seed registration happens in `pre_register_seeds` before the task graph.
-/// This impl verifies the seed was registered successfully (schema exists in
-/// the store). If not, returns `Errored` to propagate failure through the
-/// task graph skip mechanism. The actual error was already emitted by
-/// `pre_register_seeds`.
+/// A seed whose registration failed this run fails here with that error (the
+/// only place it is said). Otherwise this verifies the seed was registered (its
+/// schema is in the store), and returns `Errored` if not, to propagate failure
+/// through the task graph skip mechanism.
 use std::sync::Arc;
 
 use dbt_common::FsResult;

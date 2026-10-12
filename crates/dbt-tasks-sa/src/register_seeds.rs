@@ -278,13 +278,7 @@ pub async fn pre_register_seeds(
     let mut results = Vec::with_capacity(handles.len());
     for (unique_id, handle) in handles {
         match handle.await {
-            Ok(Ok(registered)) => {
-                registration_errors()
-                    .lock()
-                    .unwrap_or_else(|p| p.into_inner())
-                    .remove(&unique_id);
-                results.push(registered)
-            }
+            Ok(Ok(registered)) => results.push(registered),
             // Recorded against the seed, whose render fails with it — said once, there.
             Ok(Err(e)) => {
                 registration_errors()
@@ -424,15 +418,21 @@ pub fn dialect_adapted_schema(
 /// only one — a column lost without a word (ferrion #533). Named by both spellings, as
 /// the header has them, and by what made them one.
 fn refuse_folded_collisions(seed: &DbtSeed, source: &Schema, folded: &Schema) -> FsResult<()> {
-    match header_collision(source, folded) {
-        None => Ok(()),
-        Some((first, second, name)) => Err(fs_err!(
-            ErrorCode::FailedToRegisterSeedTable,
-            "seed {}: {}",
-            seed.__common_attr__.name,
-            collision_message(&first, &second, &name)
-        )),
+    // Every colliding pair at once, so one fix of the header settles them all.
+    let collisions = header_collisions(source, folded);
+    if collisions.is_empty() {
+        return Ok(());
     }
+    Err(fs_err!(
+        ErrorCode::FailedToRegisterSeedTable,
+        "seed {}: {}",
+        seed.__common_attr__.name,
+        collisions
+            .iter()
+            .map(|(first, second, name)| collision_message(first, second, name))
+            .collect::<Vec<_>>()
+            .join("; ")
+    ))
 }
 
 /// What a header collision is, said by what made the two names one, and the one fix
@@ -452,19 +452,30 @@ fn collision_message(first: &str, second: &str, name: &str) -> String {
     format!("columns {first:?} and {second:?} are both {name:?} {how}; rename one in the header")
 }
 
-/// The first two header names the adapted schema gives one name: (first, second, name).
-fn header_collision(source: &Schema, folded: &Schema) -> Option<(String, String, String)> {
+/// Every pair of header names the adapted schema gives one name, in header order:
+/// (the first spelling, this one, the name they share).
+fn header_collisions(source: &Schema, folded: &Schema) -> Vec<(String, String, String)> {
     let mut seen: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+    let mut found = Vec::new();
     for (original, field) in source.fields().iter().zip(folded.fields().iter()) {
-        if let Some(first) = seen.insert(field.name().as_str(), original.name().as_str()) {
-            return Some((
+        match seen.get(field.name().as_str()) {
+            Some(first) => found.push((
                 first.to_string(),
                 original.name().clone(),
                 field.name().clone(),
-            ));
+            )),
+            None => {
+                seen.insert(field.name().as_str(), original.name().as_str());
+            }
         }
     }
-    None
+    found
+}
+
+/// The first such pair, if any.
+#[cfg(test)]
+fn header_collision(source: &Schema, folded: &Schema) -> Option<(String, String, String)> {
+    header_collisions(source, folded).into_iter().next()
 }
 
 #[cfg(test)]
@@ -494,6 +505,19 @@ mod folded_collision_tests {
         assert_eq!(
             header_collision(&source, &upper),
             Some(("Id".into(), "ID".into(), "ID".into()))
+        );
+    }
+
+    #[test]
+    fn every_pair_is_found_at_once() {
+        let source = schema(&["Id", "ID", "Name", "NAME"]);
+        let folded = adapt_schema(source.clone(), InferColumnNameStrategy::Lowercase);
+        assert_eq!(
+            header_collisions(&source, &folded),
+            vec![
+                ("Id".into(), "ID".into(), "id".into()),
+                ("Name".into(), "NAME".into(), "name".into()),
+            ]
         );
     }
 
