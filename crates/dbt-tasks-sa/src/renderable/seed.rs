@@ -27,7 +27,8 @@ pub fn run_seed_render(
         return Err(Box::new(e));
     }
     if !ctx.schema_cache.exists(&cfqn) {
-        // Don't emit a new error — pre_register_seeds already logged it.
+        // Not registered, and no error recorded for it (a seed not scheduled for
+        // registration): failed without a second message.
         return Ok(NodeStatus::Errored);
     }
 

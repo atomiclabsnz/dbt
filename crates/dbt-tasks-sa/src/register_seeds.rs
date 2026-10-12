@@ -195,7 +195,7 @@ async fn register_seed_parquet_async(
 /// (CSV, JSON are on blocking workers; parquet is async)
 ///
 /// An error does not abort the run: it is recorded against its seed
-/// ([`registration_error`]) and logged, and that seed's render fails with it — so
+/// ([`registration_error`]), and that seed's render fails with it — so
 /// the reason is the seed's own result, the other seeds and models still run, and a
 /// schema an earlier run registered for the seed cannot stand in for this one.
 #[allow(clippy::too_many_arguments)]
@@ -278,17 +278,32 @@ pub async fn pre_register_seeds(
     let mut results = Vec::with_capacity(handles.len());
     for (unique_id, handle) in handles {
         match handle.await {
-            Ok(Ok(registered)) => results.push(registered),
-            // Logged now, and recorded against the seed, whose render fails with it.
+            Ok(Ok(registered)) => {
+                registration_errors()
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .remove(&unique_id);
+                results.push(registered)
+            }
+            // Recorded against the seed, whose render fails with it — said once, there.
             Ok(Err(e)) => {
-                tracing::error!("{}", e);
                 registration_errors()
                     .lock()
                     .unwrap_or_else(|p| p.into_inner())
                     .insert(unique_id, (e.code, e.context.clone()));
             }
+            // A registration that panicked failed too: not left to an earlier schema.
             Err(join_err) => {
-                tracing::error!("Seed registration task panicked: {}", join_err)
+                registration_errors()
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .insert(
+                        unique_id,
+                        (
+                            ErrorCode::FailedToRegisterSeedTable,
+                            format!("seed registration panicked: {join_err}"),
+                        ),
+                    );
             }
         }
     }
