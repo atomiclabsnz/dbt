@@ -372,28 +372,89 @@ pub fn dialect_adapted_schema(
     Ok(adapted_schema)
 }
 
-/// Refuse a seed whose header names two columns the same once folded (`Id`, `ID` under
-/// `quote_columns: false`): written on, the two fields share a name, and the agate table
-/// the seed's materialization reads keeps only one — a column lost without a word
-/// (ferrion #533). Named by both spellings, as the CSV header has them.
-fn refuse_folded_collisions(
-    seed: &DbtSeed,
-    source: &Schema,
-    folded: &Schema,
-) -> FsResult<()> {
+/// Refuse a seed whose header names two columns the same once adapted — folded
+/// (`Id`, `ID` under `quote_columns: false`) or trimmed (`id`, ` id`): written on, the
+/// two fields share a name, and the agate table the seed's materialization reads keeps
+/// only one — a column lost without a word (ferrion #533). Named by both spellings, as
+/// the header has them, and by what made them one.
+fn refuse_folded_collisions(seed: &DbtSeed, source: &Schema, folded: &Schema) -> FsResult<()> {
+    match header_collision(source, folded) {
+        None => Ok(()),
+        Some((first, second, name)) => {
+            let how = if first.trim() == second.trim() {
+                "once their names are trimmed".to_string()
+            } else {
+                "once their names are folded (quote_columns: false); rename one in the \
+                 header, or quote the columns"
+                    .to_string()
+            };
+            Err(fs_err!(
+                ErrorCode::InvalidConfig,
+                "seed {}: columns {:?} and {:?} are both {:?} {how}",
+                seed.__common_attr__.name,
+                first,
+                second,
+                name
+            ))
+        }
+    }
+}
+
+/// The first two header names the adapted schema gives one name: (first, second, name).
+fn header_collision(source: &Schema, folded: &Schema) -> Option<(String, String, String)> {
     let mut seen: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
     for (original, field) in source.fields().iter().zip(folded.fields().iter()) {
         if let Some(first) = seen.insert(field.name().as_str(), original.name().as_str()) {
-            return Err(fs_err!(
-                ErrorCode::InvalidConfig,
-                "seed {}: columns {} and {} are both {} once their names are folded \
-                 (quote_columns: false); rename one in the header, or quote the columns",
-                seed.__common_attr__.name,
-                first,
-                original.name(),
-                field.name()
+            return Some((
+                first.to_string(),
+                original.name().clone(),
+                field.name().clone(),
             ));
         }
     }
-    Ok(())
+    None
+}
+
+#[cfg(test)]
+mod folded_collision_tests {
+    use super::*;
+    use dbt_df_providers::seed_io::InferColumnNameStrategy;
+
+    fn schema(names: &[&str]) -> Arc<Schema> {
+        Arc::new(Schema::new(
+            names
+                .iter()
+                .map(|n| Field::new(*n, DataType::Int64, true))
+                .collect::<Vec<_>>(),
+        ))
+    }
+
+    #[test]
+    fn a_folded_pair_is_found_with_both_spellings() {
+        let source = schema(&["Id", "name", "ID"]);
+        let folded = adapt_schema(source.clone(), InferColumnNameStrategy::Lowercase);
+        assert_eq!(
+            header_collision(&source, &folded),
+            Some(("Id".into(), "ID".into(), "id".into()))
+        );
+        // Snowflake folds up: the same pair collides there too.
+        let upper = adapt_schema(source.clone(), InferColumnNameStrategy::Uppercase);
+        assert_eq!(
+            header_collision(&source, &upper),
+            Some(("Id".into(), "ID".into(), "ID".into()))
+        );
+    }
+
+    #[test]
+    fn verbatim_names_differing_in_case_do_not_collide_and_trimmed_ones_do() {
+        let source = schema(&["Id", "ID"]);
+        let verbatim = adapt_schema(source.clone(), InferColumnNameStrategy::Verbatim);
+        assert_eq!(header_collision(&source, &verbatim), None);
+        let padded = schema(&["id", " id"]);
+        let trimmed = adapt_schema(padded.clone(), InferColumnNameStrategy::Verbatim);
+        assert_eq!(
+            header_collision(&padded, &trimmed),
+            Some(("id".into(), " id".into(), "id".into()))
+        );
+    }
 }
