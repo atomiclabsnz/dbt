@@ -188,7 +188,7 @@ pub fn merge_prune_arrow(
 
     // Pass 1: old rows, minus those being replaced.
     if path.vfs_exists() {
-        let old_file = dbt_vfs::fs::File::open(path)?;
+        let old_file = read_chunks(path)?;
         if let Ok(builder) = ParquetRecordBatchReaderBuilder::try_new(old_file) {
             let key_idx = builder.schema().index_of(key_col).ok();
             if let Ok(reader) = builder.build() {
@@ -244,7 +244,7 @@ fn read_parquet_rows(path: &Path) -> Result<Option<Vec<Map<String, Value>>>, Ind
     if !path.vfs_exists() {
         return Ok(None);
     }
-    let file = dbt_vfs::fs::File::open(path)?;
+    let file = read_chunks(path)?;
     let builder = match ParquetRecordBatchReaderBuilder::try_new(file) {
         Ok(b) => b,
         Err(_) => return Ok(None),
@@ -841,7 +841,7 @@ impl IndexWriter {
             .map_err(|e| IndexError::Other(format!("ArrowWriter: {e}")))?;
         // Pass 1: old rows minus drop_keys
         if path.vfs_exists() {
-            let old_file = dbt_vfs::fs::File::open(&path)?;
+            let old_file = read_chunks(&path)?;
             if let Ok(builder) = ParquetRecordBatchReaderBuilder::try_new(old_file) {
                 let key_idx = builder.schema().index_of(key_col).ok();
                 if let Ok(reader) = builder.build() {
@@ -2148,4 +2148,11 @@ pub fn schema_for(table: &str) -> SchemaRef {
         )])),
         _ => Arc::new(Schema::empty()),
     }
+}
+
+/// A parquet file's bytes, for a reader: `dbt_vfs`'s in-memory `File` is not a
+/// `ChunkReader` (std's is), and `Bytes` is one on every target. The index's files are
+/// metadata tables, small enough to read whole (ferrion #520).
+pub(crate) fn read_chunks(path: &std::path::Path) -> std::io::Result<bytes::Bytes> {
+    dbt_vfs::fs::read(path).map(bytes::Bytes::from)
 }

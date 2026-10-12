@@ -16,6 +16,7 @@ workspace = true
 path = "src/lib.rs"
 
 [dependencies]
+bytes = { workspace = true }
 dbt-vfs = { workspace = true }
 adbc-core = { workspace = true }
 arrow-array = { workspace = true }

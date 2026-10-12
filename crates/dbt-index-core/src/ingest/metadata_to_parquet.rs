@@ -378,7 +378,7 @@ pub fn read_parquet_batches_proj(
     path: &Path,
     cols: &[&str],
 ) -> Result<Vec<arrow_array::RecordBatch>, IndexError> {
-    let file = dbt_vfs::fs::File::open(path)?;
+    let file = crate::parquet::read_chunks(path)?;
     let builder = ParquetRecordBatchReaderBuilder::try_new(file)
         .map_err(|e| IndexError::Other(format!("parquet open {}: {e}", path.display())))?;
     let builder = builder.with_batch_size(65536);
