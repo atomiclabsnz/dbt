@@ -93,7 +93,8 @@ fn register_seed_csv(
     } else {
         None
     };
-    let target_schema = adapt_schema(result.schema, infer_column_name_strategy);
+    let target_schema = adapt_schema(result.schema.clone(), infer_column_name_strategy);
+    refuse_folded_collisions(&seed, &result.schema, &target_schema)?;
     let schema =
         dialect_adapted_schema(&target_schema, logical_fields.as_ref(), type_ops.as_ref())?;
     ctx.schema_cache
@@ -127,7 +128,8 @@ fn register_seed_json(
     } else {
         None
     };
-    let target_schema = adapt_schema(source_schema, infer_column_name_strategy);
+    let target_schema = adapt_schema(source_schema.clone(), infer_column_name_strategy);
+    refuse_folded_collisions(&seed, &source_schema, &target_schema)?;
     let schema =
         dialect_adapted_schema(&target_schema, logical_fields.as_ref(), type_ops.as_ref())?;
     ctx.schema_cache
@@ -164,7 +166,8 @@ async fn register_seed_parquet_async(
     } else {
         None
     };
-    let target_schema = adapt_schema(source_schema, infer_column_name_strategy);
+    let target_schema = adapt_schema(source_schema.clone(), infer_column_name_strategy);
+    refuse_folded_collisions(&seed, &source_schema, &target_schema)?;
     let schema =
         dialect_adapted_schema(&target_schema, logical_fields.as_ref(), type_ops.as_ref())?;
     ctx.schema_cache
@@ -367,4 +370,30 @@ pub fn dialect_adapted_schema(
         source_schema.metadata().clone(),
     ));
     Ok(adapted_schema)
+}
+
+/// Refuse a seed whose header names two columns the same once folded (`Id`, `ID` under
+/// `quote_columns: false`): written on, the two fields share a name, and the agate table
+/// the seed's materialization reads keeps only one — a column lost without a word
+/// (ferrion #533). Named by both spellings, as the CSV header has them.
+fn refuse_folded_collisions(
+    seed: &DbtSeed,
+    source: &Schema,
+    folded: &Schema,
+) -> FsResult<()> {
+    let mut seen: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+    for (original, field) in source.fields().iter().zip(folded.fields().iter()) {
+        if let Some(first) = seen.insert(field.name().as_str(), original.name().as_str()) {
+            return Err(fs_err!(
+                ErrorCode::InvalidConfig,
+                "seed {}: columns {} and {} are both {} once their names are folded \
+                 (quote_columns: false); rename one in the header, or quote the columns",
+                seed.__common_attr__.name,
+                first,
+                original.name(),
+                field.name()
+            ));
+        }
+    }
+    Ok(())
 }
