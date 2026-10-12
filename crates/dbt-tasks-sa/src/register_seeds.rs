@@ -194,8 +194,10 @@ async fn register_seed_parquet_async(
 /// Pre-register scheduled seeds before the task graph runs.
 /// (CSV, JSON are on blocking workers; parquet is async)
 ///
-/// Errors are logged immediately but do not abort the run. Failed seeds will
-/// be detected during the render phase when the schema store check fails.
+/// An error does not abort the run: it is recorded against its seed
+/// ([`registration_error`]) and logged, and that seed's render fails with it — so
+/// the reason is the seed's own result, the other seeds and models still run, and a
+/// schema an earlier run registered for the seed cannot stand in for this one.
 #[allow(clippy::too_many_arguments)]
 pub async fn pre_register_seeds(
     sorted_nodes: &[&String],
@@ -205,7 +207,13 @@ pub async fn pre_register_seeds(
     data_store: Arc<dyn DataStoreTrait>,
     type_ops: Arc<dyn TypeOps>,
     in_dir: &Path,
-) -> FsResult<Vec<RegisteredSeed>> {
+) -> Vec<RegisteredSeed> {
+    // This run's errors only: a seed fixed since an earlier run in the same process
+    // (a browser tab runs many) must not fail on that run's error.
+    registration_errors()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .clear();
     let ctx = Arc::new(SeedRegistrationCtx {
         adapter_type,
         schema_cache,
@@ -213,7 +221,7 @@ pub async fn pre_register_seeds(
         in_dir: in_dir.to_path_buf(),
     });
 
-    let mut handles: Vec<tokio::task::JoinHandle<FsResult<RegisteredSeed>>> = Vec::new();
+    let mut handles: Vec<(String, tokio::task::JoinHandle<FsResult<RegisteredSeed>>)> = Vec::new();
 
     for unique_id in sorted_nodes {
         let Some(seed) = seeds.get(*unique_id) else {
@@ -242,21 +250,24 @@ pub async fn pre_register_seeds(
         match format {
             None => {
                 let type_ops = Arc::clone(&type_ops);
-                handles.push(spawn_blocking_traced(move || {
-                    register_seed_csv(seed, ctx, type_ops)
-                }))
+                handles.push((
+                    seed.__common_attr__.unique_id.clone(),
+                    spawn_blocking_traced(move || register_seed_csv(seed, ctx, type_ops)),
+                ))
             }
             Some(TableFormat::Json) => {
                 let type_ops = Arc::clone(&type_ops);
-                handles.push(spawn_blocking_traced(move || {
-                    register_seed_json(seed, ctx, type_ops)
-                }))
+                handles.push((
+                    seed.__common_attr__.unique_id.clone(),
+                    spawn_blocking_traced(move || register_seed_json(seed, ctx, type_ops)),
+                ))
             }
             Some(TableFormat::Parquet) => {
                 let type_ops = Arc::clone(&type_ops);
-                handles.push(spawn_traced(register_seed_parquet_async(
-                    seed, ctx, type_ops,
-                )))
+                handles.push((
+                    seed.__common_attr__.unique_id.clone(),
+                    spawn_traced(register_seed_parquet_async(seed, ctx, type_ops)),
+                ))
             }
             Some(TableFormat::Csv) => {
                 unreachable!("extension dispatch only yields csv as None, not TableFormat::Csv")
@@ -265,28 +276,39 @@ pub async fn pre_register_seeds(
     }
 
     let mut results = Vec::with_capacity(handles.len());
-    for handle in handles {
+    for (unique_id, handle) in handles {
         match handle.await {
             Ok(Ok(registered)) => results.push(registered),
-            // Emit the real error here (CSV parse failure, etc.). The seed's
-            // visit_render will detect the missing schema and mark the task as
-            // failed without emitting a second error.
-            // A header that collides once adapted (#533) fails the run, so its reason is
-            // the run's error, and no schema an earlier run registered for the seed can
-            // stand in for the refused one.
-            Ok(Err(e))
-                if e.code == ErrorCode::InvalidCsvFormat
-                    && e.to_string().contains("rename one") =>
-            {
-                return Err(e);
+            // Logged now, and recorded against the seed, whose render fails with it.
+            Ok(Err(e)) => {
+                tracing::error!("{}", e);
+                registration_errors()
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .insert(unique_id, (e.code, e.context.clone()));
             }
-            Ok(Err(e)) => tracing::error!("{}", e),
             Err(join_err) => {
                 tracing::error!("Seed registration task panicked: {}", join_err)
             }
         }
     }
-    Ok(results)
+    results
+}
+
+type RegistrationErrors = std::sync::Mutex<std::collections::HashMap<String, (ErrorCode, String)>>;
+
+fn registration_errors() -> &'static RegistrationErrors {
+    static ERRORS: std::sync::OnceLock<RegistrationErrors> = std::sync::OnceLock::new();
+    ERRORS.get_or_init(Default::default)
+}
+
+/// The error this run's registration of the seed `unique_id` failed with, if it did.
+pub fn registration_error(unique_id: &str) -> Option<dbt_common::FsError> {
+    registration_errors()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .get(unique_id)
+        .map(|(code, context)| *fs_err!(*code, "{context}"))
 }
 
 fn parse_provided_types(
@@ -390,7 +412,7 @@ fn refuse_folded_collisions(seed: &DbtSeed, source: &Schema, folded: &Schema) ->
     match header_collision(source, folded) {
         None => Ok(()),
         Some((first, second, name)) => Err(fs_err!(
-            ErrorCode::InvalidCsvFormat,
+            ErrorCode::FailedToRegisterSeedTable,
             "seed {}: {}",
             seed.__common_attr__.name,
             collision_message(&first, &second, &name)
@@ -402,12 +424,15 @@ fn refuse_folded_collisions(seed: &DbtSeed, source: &Schema, folded: &Schema) ->
 /// that works whatever `quote_columns` says: rename one (quoting a case pair is refused
 /// too, as DuckDB refuses it).
 fn collision_message(first: &str, second: &str, name: &str) -> String {
-    let how = if first == second {
+    if first == second {
         return format!("column {first:?} appears twice in the header; rename one");
-    } else if first.trim() == second.trim() {
-        "once their names are trimmed"
-    } else {
-        "once their names are folded (quote_columns: false)"
+    }
+    let trimmed = first.trim() != first || second.trim() != second;
+    let folded = first.trim() != second.trim();
+    let how = match (trimmed, folded) {
+        (true, true) => "once their names are trimmed and folded (quote_columns: false)",
+        (true, false) => "once their names are trimmed",
+        _ => "once their names are folded (quote_columns: false)",
     };
     format!("columns {first:?} and {second:?} are both {name:?} {how}; rename one in the header")
 }
@@ -468,6 +493,11 @@ mod folded_collision_tests {
             collision_message("id", " id", "id"),
             "columns \"id\" and \" id\" are both \"id\" once their names are trimmed; \
              rename one in the header"
+        );
+        assert_eq!(
+            collision_message("Id", " id", "id"),
+            "columns \"Id\" and \" id\" are both \"id\" once their names are trimmed and \
+             folded (quote_columns: false); rename one in the header"
         );
         assert_eq!(
             collision_message("id", "id", "id"),

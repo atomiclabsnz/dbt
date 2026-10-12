@@ -21,6 +21,11 @@ pub fn run_seed_render(
     let relation =
         dbt_adapter::relation::create_relation_from_node(ctx.adapter_type(), node.as_ref(), None)?;
     let cfqn = relation.get_canonical_fqn()?;
+    // Its registration failed this run: that error is this seed's result, whatever
+    // schema an earlier run left (ferrion #533, #547).
+    if let Some(e) = crate::register_seeds::registration_error(&node.common().unique_id) {
+        return Err(Box::new(e));
+    }
     if !ctx.schema_cache.exists(&cfqn) {
         // Don't emit a new error — pre_register_seeds already logged it.
         return Ok(NodeStatus::Errored);
