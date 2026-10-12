@@ -1840,6 +1840,12 @@ async fn run_docs_generate(
         return Err(FsError::exit_with_status(1));
     }
 
+    // In a browser tab there is no DuckDB: the export asks the index's own files (ferrion
+    // #520); the site it writes queries the index in the viewer's browser.
+    #[cfg(target_arch = "wasm32")]
+    let backend: Arc<dyn Backend> =
+        Arc::new(dbt_index_core::backend::IndexFilesBackend::new(&index_dir));
+    #[cfg(not(target_arch = "wasm32"))]
     let backend: Arc<dyn Backend> = Arc::new(match DuckDbViewsBackend::open(&index_dir) {
         Ok(backend) => backend,
         Err(err) => {

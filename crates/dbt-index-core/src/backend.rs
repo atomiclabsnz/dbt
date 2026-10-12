@@ -82,6 +82,59 @@ pub struct UnavailableBackend;
 
 impl Backend for UnavailableBackend {}
 
+/// The index's own files, read without a SQL engine: what a host with no DuckDB (a
+/// browser tab) can still answer. `SELECT COUNT(*) FROM <schema>.<table>` and
+/// [`table_has_rows`](Backend::table_has_rows) come from `<schema>.<table>.parquet`'s
+/// footer; everything else is unavailable. Enough for `dbt docs generate`'s export,
+/// which asks only how many nodes there are (ferrion #520) — the site it writes
+/// queries the index itself, in the viewer's browser.
+pub struct IndexFilesBackend {
+    index_dir: std::path::PathBuf,
+}
+
+impl IndexFilesBackend {
+    pub fn new(index_dir: impl Into<std::path::PathBuf>) -> Self {
+        Self {
+            index_dir: index_dir.into(),
+        }
+    }
+
+    /// Rows in `<schema>.<table>.parquet`, from its footer.
+    fn rows(&self, table: &str) -> Option<u64> {
+        if !table
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+        {
+            return None;
+        }
+        let bytes =
+            crate::parquet::read_chunks(&self.index_dir.join(format!("{table}.parquet"))).ok()?;
+        let reader = ::parquet::file::serialized_reader::SerializedFileReader::new(bytes).ok()?;
+        use ::parquet::file::reader::FileReader as _;
+        u64::try_from(reader.metadata().file_metadata().num_rows()).ok()
+    }
+}
+
+impl Backend for IndexFilesBackend {
+    fn table_has_rows(&self, table: &str) -> bool {
+        self.rows(table).is_some_and(|n| n > 0)
+    }
+
+    fn query_scalar(&self, sql: &str) -> Option<String> {
+        let words: Vec<&str> = sql.split_whitespace().collect();
+        match words.as_slice() {
+            [select, count, from, table]
+                if select.eq_ignore_ascii_case("select")
+                    && count.eq_ignore_ascii_case("count(*)")
+                    && from.eq_ignore_ascii_case("from") =>
+            {
+                self.rows(table).map(|n| n.to_string())
+            }
+            _ => None,
+        }
+    }
+}
+
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
