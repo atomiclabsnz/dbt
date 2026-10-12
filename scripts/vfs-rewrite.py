@@ -330,22 +330,56 @@ def test_regions(src: str, mask: list[bool]) -> list[tuple[int, int]]:
 # The rewrite
 
 
+def split_top_level(group: str) -> list[str]:
+    """Split a `use` group's items at commas outside nested braces."""
+    items, depth, cur = [], 0, []
+    for ch in group:
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        if ch == "," and depth == 0:
+            items.append("".join(cur).strip())
+            cur = []
+        else:
+            cur.append(ch)
+    items.append("".join(cur).strip())
+    return [i for i in items if i]
+
+
 def rewrite_use_std_group(text: str) -> str:
-    """`use std::{fs, io};` -> `use std::{io};` + `use dbt_vfs::fs;` (one line)."""
-
-    def fix(m: re.Match) -> str:
-        items = [s.strip() for s in m.group(1).split(",") if s.strip()]
+    """`use std::{fs, io};` -> `use std::{io};` + `use dbt_vfs::fs;`, nested groups
+    (`use std::{collections::{A, B}, fs};`) included: a group with braces inside was
+    skipped before, and its `fs` stayed the real one (ferrion #520)."""
+    out, i = [], 0
+    pattern = re.compile(r"use std::\{")
+    while True:
+        m = pattern.search(text, i)
+        if not m:
+            out.append(text[i:])
+            break
+        start, j, depth = m.start(), m.end(), 1
+        while j < len(text) and depth:
+            depth += {"{": 1, "}": -1}.get(text[j], 0)
+            j += 1
+        if not text.startswith(";", j):
+            out.append(text[i : m.end()])
+            i = m.end()
+            continue
+        items = split_top_level(text[m.end() : j - 1])
         fs_items = [s for s in items if s == "fs" or s.startswith("fs::")]
+        out.append(text[i:start])
         if not fs_items:
-            return m.group(0)
-        rest = [s for s in items if s not in fs_items]
-        uses = []
-        if rest:
-            uses.append("use std::{" + ", ".join(rest) + "};")
-        uses += ["use dbt_vfs::" + s + ";" for s in fs_items]
-        return "\n".join(uses)
-
-    return re.sub(r"use std::\{([^{}]*)\};", fix, text)
+            out.append(text[start : j + 1])
+        else:
+            rest = [s for s in items if s not in fs_items]
+            uses = []
+            if rest:
+                uses.append("use std::{" + ", ".join(rest) + "};")
+            uses += ["use dbt_vfs::" + s + ";" for s in fs_items]
+            out.append("\n".join(uses))
+        i = j + 1
+    return "".join(out)
 
 
 SUBS = [
@@ -374,8 +408,39 @@ def read(path: Path) -> str:
     return FILES[path]
 
 
+def rewrite_multiline_use_std_groups(src: str, stats: Counter) -> str:
+    """A `use std::{…}` group spanning lines, rewritten whole: the per-line pass below
+    never sees such a group's closing `};` on the line it opens on (ferrion #520).
+    Test code keeps the real `fs`, as the per-line pass leaves it."""
+    regions = test_regions(src, code_mask(src))
+    out, i = [], 0
+    for m in re.finditer(r"^[ \t]*use std::\{[^;]*\n[^;]*\};", src, re.M):
+        if any(a <= m.start() < b for a, b in regions):
+            continue
+        new = rewrite_use_std_group(m.group(0).strip())
+        if new != m.group(0).strip():
+            indent = m.group(0)[: len(m.group(0)) - len(m.group(0).lstrip())]
+            # An attribute on the group (`#[cfg(windows)]`) holds for every use it
+            # becomes, not only the first.
+            before = src[: m.start()].rstrip("\n").rsplit("\n", 1)[-1].strip()
+            attr = before if before.startswith("#[") else None
+            lines = new.split("\n")
+            out.append(src[i : m.start()])
+            out.append(
+                "\n".join(
+                    (indent + attr + "\n" if attr and k else "") + indent + l
+                    for k, l in enumerate(lines)
+                )
+            )
+            i = m.end()
+            stats["std::fs"] += 1
+    out.append(src[i:])
+    return "".join(out)
+
+
 def rewrite_file(path: Path, rel: str, stats: Counter) -> bool:
-    src = read(path)
+    raw = read(path)
+    src = rewrite_multiline_use_std_groups(raw, stats)
     exc_lines = {line for f, line, _why in EXCEPTIONS if f == rel}
     regions = test_regions(src, code_mask(src))
 
@@ -415,7 +480,7 @@ def rewrite_file(path: Path, rel: str, stats: Counter) -> bool:
     text = "".join(out)
     if used_pathext and USE_PATHEXT not in text:
         text = insert_use(text, USE_PATHEXT)
-    if text == src:
+    if text == raw:
         return False
     FILES[path] = text
     return True

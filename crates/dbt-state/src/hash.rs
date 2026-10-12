@@ -3,13 +3,11 @@ use dbt_schemas::schemas::{
     DbtModel, DbtSeed, DbtTest, InternalDbtNode, InternalDbtNodeAttributes, config_excluded_keys,
     macros::DbtMacro,
 };
+use dbt_vfs::fs::File;
 use md5;
 use serde::Serialize;
 use serde_json::{Value as JsonValue, ser::Formatter, to_string};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fs::File,
-};
+use std::collections::{BTreeMap, BTreeSet};
 use std::{io, io::BufReader, io::Write};
 use thiserror::Error;
 

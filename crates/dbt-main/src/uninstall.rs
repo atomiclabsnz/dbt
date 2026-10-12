@@ -4,8 +4,9 @@ use dbt_vfs::env;
 use run_script::ScriptOptions;
 
 #[cfg(target_os = "windows")]
+use dbt_vfs::fs::File;
+#[cfg(target_os = "windows")]
 use std::{
-    fs::File,
     io::Write,
     process::{Command, Stdio},
 };

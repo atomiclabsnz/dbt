@@ -40,10 +40,10 @@
 //! deserialized row vectors.
 
 use dbt_vfs::PathExt as _;
+use dbt_vfs::fs;
 use dbt_vfs::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    fs,
     path::{Path, PathBuf},
     sync::Arc,
 };

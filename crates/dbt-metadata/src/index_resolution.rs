@@ -10,9 +10,9 @@
 //! * Always includes all macros — needed for Jinja rendering.
 
 use dbt_vfs::PathExt as _;
+use dbt_vfs::fs;
 use std::{
     collections::{HashMap, HashSet},
-    fs,
     path::Path,
 };
 
