@@ -852,7 +852,7 @@ impl DbtProjectCompilation {
                 arg.vars.clone(),
             )
             .ok()
-            .and_then(|(project, _)| project.dispatch.clone())
+            .and_then(|(project, _)| project.dispatch)
             .map(|configs| {
                 configs
                     .into_iter()
