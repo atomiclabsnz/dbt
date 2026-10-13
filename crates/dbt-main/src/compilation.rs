@@ -821,6 +821,60 @@ impl DbtProjectCompilation {
         )
     }
 
+    /// Resolves selectors.yml for a compilation reused whole from the kept parse state.
+    ///
+    /// The kept state carries no selector definitions: selectors.yml is rendered with the
+    /// project's macros, so the reuse path in `partial_parse` leaves them empty, and a run
+    /// that returns the kept state as it is (no files changed, or the partial-load fast
+    /// path) would otherwise lose `--selector`, `--select selector:…` and a `default: true`
+    /// selector, and select every node. This is the resolver's own resolution, run against
+    /// this run's arguments and the reused macros.
+    pub(crate) fn resolve_reused_selectors(
+        &mut self,
+        arg: &EvalArgs,
+        jinja_env: &JinjaEnv,
+    ) -> FsResult<()> {
+        use dbt_common::once_cell_vars::DISPATCH_CONFIG;
+        use dbt_parser::resolve::resolve_selectors::{
+            resolve_final_selectors, resolve_manifest_selectors, resolve_selectors_from_yaml,
+        };
+
+        // selectors.yml renders with the project's dispatch order, which the loader sets
+        // once per process. A reused state skips the loader, so a fresh process sets it
+        // here, from dbt_project.yml as the loader would; an unreadable project leaves it
+        // empty, which is what a project without `dispatch:` has.
+        if DISPATCH_CONFIG.get().is_none() {
+            let path = arg.io.in_dir.join(dbt_common::constants::DBT_PROJECT_YML);
+            let dispatch = dbt_loader::dbt_project_yml_loader::load_project_yml(
+                jinja_env,
+                &path,
+                None,
+                arg.vars.clone(),
+            )
+            .ok()
+            .and_then(|(project, _)| project.dispatch.clone())
+            .map(|configs| {
+                configs
+                    .into_iter()
+                    .map(|config| (config.macro_namespace, config.search_order))
+                    .collect()
+            })
+            .unwrap_or_default();
+            DISPATCH_CONFIG.get_or_init(|| std::sync::RwLock::new(dispatch));
+        }
+
+        let resolve_args = ResolveArgs::try_from_eval_args(arg)?;
+        let root_project_name = self.resolved_state.root_project_name.clone();
+        let definitions =
+            resolve_selectors_from_yaml(&resolve_args, &root_project_name, jinja_env)?;
+        self.resolved_state.manifest_selectors = resolve_manifest_selectors(definitions.clone())?;
+        self.resolved_state.resolved_selectors =
+            resolve_final_selectors(definitions, &resolve_args)?;
+        // The manifest is built from the resolved state, so one built before this is stale.
+        self.lazy_dbt_manifest = OnceLock::new();
+        Ok(())
+    }
+
     pub fn take_dbt_manifest(&mut self) -> DbtManifestV12 {
         self.lazy_dbt_manifest
             .take()
@@ -1058,6 +1112,7 @@ impl DbtProjectCompilation {
                     tracing::debug!("Partial parse: partial-load fast path — no file changes");
                     compilation.partial_load_filter_applied = true;
                     let jinja_env = compilation.create_jinja_env(arg, token.clone())?;
+                    compilation.resolve_reused_selectors(arg, &jinja_env)?;
                     return Ok((compilation, jinja_env, None));
                 }
             } else {
@@ -1143,7 +1198,9 @@ impl DbtProjectCompilation {
                             .await;
                         }
                     };
+                    let mut compilation = compilation;
                     let jinja_env = compilation.create_jinja_env(arg, token.clone())?;
+                    compilation.resolve_reused_selectors(arg, &jinja_env)?;
                     Ok((compilation, jinja_env, None))
                 } else {
                     DbtProjectCompilation::initialize(

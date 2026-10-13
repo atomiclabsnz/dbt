@@ -243,8 +243,10 @@ pub fn try_load_prev_compilation(
             let mut resolved = ResolvedSelector {
                 include: eval.select.clone(),
                 exclude: eval.exclude.clone(),
-                // Empty on the partial-parse path: selectors.yml is not re-parsed here, so
-                // `selector:` references in --select/--exclude cannot be resolved.
+                // Empty here: selectors.yml renders with the project's macros, and this
+                // state has no Jinja environment yet. A run that re-resolves (files
+                // changed) resolves them in the resolver; a run that reuses this state
+                // whole resolves them in `DbtProjectCompilation::resolve_reused_selectors`.
                 selector_definitions: Default::default(),
             };
             let default_mode: IndirectSelection = eval.indirect_selection.unwrap_or_default();
