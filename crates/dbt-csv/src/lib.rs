@@ -122,6 +122,10 @@ pub struct CsvReadResult {
     pub batches: Vec<RecordBatch>,
     /// Column names from `text_columns` that didn't match any CSV header
     pub unmatched_text_columns: Vec<String>,
+    /// The header row as the file writes it, before a repeated name is renamed (`id,id`
+    /// is read as `id`, `id_2`): what a message about the header should name. Empty
+    /// when the file has no header row.
+    pub header: Vec<String>,
 }
 
 /// Check if the first line of data is empty (only contains line terminators).
@@ -177,10 +181,23 @@ pub fn read_to_arrow_records(
 
     let batches = reader.collect::<Result<Vec<_>, _>>()?;
 
+    let header = if has_header {
+        csv::ReaderBuilder::new()
+            .delimiter(options.delimiter)
+            .flexible(true)
+            .from_reader(Cursor::new(data_for_processing))
+            .headers()
+            .map(|h| h.iter().map(str::to_string).collect())
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
     Ok(CsvReadResult {
         schema,
         batches,
         unmatched_text_columns,
+        header,
     })
 }
 

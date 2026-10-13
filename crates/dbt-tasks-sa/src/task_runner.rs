@@ -130,11 +130,13 @@ impl TaskRunner {
         })
     }
 
+    /// Registers the selected seeds, and returns each one whose registration failed with
+    /// its error, for the run's `TaskRunnerCtxInner::seed_registration_errors`.
     pub async fn register_seeds_for_selected_ids(
         &self,
         run_task_args: &RunTasksArgs,
         schedule: &Schedule<String>,
-    ) -> FsResult<()> {
+    ) -> FsResult<Vec<(String, Box<FsError>)>> {
         let adapter_type = self.resolved_state.dbt_profile.db_config.adapter_type();
         // Pre-register only *selected* seeds (not frontier dependencies) so that
         // frontier seeds don't mask "missing in remote" static analysis errors.
@@ -146,7 +148,7 @@ impl TaskRunner {
                     && schedule.selected_nodes.contains(*uid)
             })
             .collect();
-        register_seeds::pre_register_seeds(
+        let (_, errors) = register_seeds::pre_register_seeds(
             &selected_seed_ids,
             &self.resolved_state.nodes.seeds,
             adapter_type,
@@ -157,7 +159,7 @@ impl TaskRunner {
         )
         .await;
 
-        Ok(())
+        Ok(errors)
     }
 
     /// Print the task graph for debugging

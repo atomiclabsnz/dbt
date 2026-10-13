@@ -181,6 +181,11 @@ pub struct TaskRunnerCtxInner {
     pub runtime_config: Arc<DbtRuntimeConfig>,
     pub generic_test_relationships: GenericTestRelationships,
     span_manager: Arc<SpanManager<FsResult<NodeStatus>, SkipReason>>,
+    /// Each seed whose registration failed in this run, with the error it failed with
+    /// (ferrion #533, #547, #549). Filled after the seeds are registered, before the
+    /// task graph runs. A seed's render takes its error out and fails with it. The
+    /// map belongs to this run, so another run in the same process cannot see it.
+    pub seed_registration_errors: DashMap<String, Box<dbt_common::FsError>>,
     /// Captured show batches for the LSP preview path; set by run_show, collected after the task loop.
     pub preview_results: parking_lot::Mutex<Option<(Vec<RecordBatch>, SchemaRef)>>,
     /// Error from a failed show query; set by run_show when execution fails, collected after the task loop.
@@ -262,6 +267,7 @@ impl TaskRunnerCtxInner {
             runtime_config: resolver_state.runtime_config.clone(),
             generic_test_relationships,
             span_manager,
+            seed_registration_errors: DashMap::default(),
             preview_results: parking_lot::Mutex::new(None),
             preview_error: parking_lot::Mutex::new(None),
             run_cache_ctx,

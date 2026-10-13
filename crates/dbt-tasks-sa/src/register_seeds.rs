@@ -8,11 +8,11 @@ use dbt_adapter::relation::create_relation_from_node;
 use dbt_adapter::sql_types::TypeOps;
 use dbt_adapter_core::AdapterType;
 use dbt_common::tracing::{dbt_emit::emit_warn_log_message, spawn_blocking_traced, spawn_traced};
-use dbt_common::{ErrorCode, FsResult, fs_err};
+use dbt_common::{ErrorCode, FsError, FsResult, fs_err};
 use dbt_csv::{CustomCsvOptions, read_to_arrow_records};
 use dbt_df_providers::seed_io::{
-    TableFormat, adapt_schema, infer_seed_column_name_strategy, read_json_seed,
-    read_parquet_seed_view,
+    InferColumnNameStrategy, TableFormat, adapt_schema, infer_seed_column_name_strategy,
+    read_json_seed, read_parquet_seed_view,
 };
 
 use dbt_frontend_common::Dialect;
@@ -65,9 +65,6 @@ fn register_seed_csv(
     if let Some(relation_name) = &seed.__base_attr__.relation_name {
         dbt_common::seed_path_registry::register(relation_name, seed_path.clone());
     }
-    let infer_column_name_strategy =
-        infer_seed_column_name_strategy(seed.__seed_attr__.quote_columns, ctx.adapter_type);
-
     let text_columns: Vec<String> = seed
         .__seed_attr__
         .column_types
@@ -93,8 +90,7 @@ fn register_seed_csv(
     } else {
         None
     };
-    let target_schema = adapt_schema(result.schema.clone(), infer_column_name_strategy);
-    refuse_header_collisions(&seed, &result.schema, &target_schema)?;
+    let target_schema = adapt_seed_schema(&seed, &result.schema, ctx.adapter_type, &result.header)?;
     let schema =
         dialect_adapted_schema(&target_schema, logical_fields.as_ref(), type_ops.as_ref())?;
     ctx.schema_cache
@@ -119,17 +115,13 @@ fn register_seed_json(
     let relation = create_relation_from_node(ctx.adapter_type, seed.as_ref(), None)?;
     let canonical_fqn = relation.get_canonical_fqn()?;
     let seed_path = resolve_seed_path(&ctx.in_dir, &seed);
-    let infer_column_name_strategy =
-        infer_seed_column_name_strategy(seed.__seed_attr__.quote_columns, ctx.adapter_type);
-
     let (source_schema, maybe_batches) = read_json_seed(&seed_path, true)?;
     let logical_fields = if let Some(provided_types) = &seed.__seed_attr__.column_types {
         Some(parse_provided_types(provided_types, type_ops.as_ref())?)
     } else {
         None
     };
-    let target_schema = adapt_schema(source_schema.clone(), infer_column_name_strategy);
-    refuse_header_collisions(&seed, &source_schema, &target_schema)?;
+    let target_schema = adapt_seed_schema(&seed, &source_schema, ctx.adapter_type, &[])?;
     let schema =
         dialect_adapted_schema(&target_schema, logical_fields.as_ref(), type_ops.as_ref())?;
     ctx.schema_cache
@@ -157,17 +149,13 @@ async fn register_seed_parquet_async(
     let relation = create_relation_from_node(ctx.adapter_type, seed.as_ref(), None)?;
     let canonical_fqn = relation.get_canonical_fqn()?;
     let seed_path = resolve_seed_path(&ctx.in_dir, &seed);
-    let infer_column_name_strategy =
-        infer_seed_column_name_strategy(seed.__seed_attr__.quote_columns, ctx.adapter_type);
-
     let (source_schema, maybe_batches) = read_parquet_seed_view(&seed_path, true).await?;
     let logical_fields = if let Some(provided_types) = &seed.__seed_attr__.column_types {
         Some(parse_provided_types(provided_types, type_ops.as_ref())?)
     } else {
         None
     };
-    let target_schema = adapt_schema(source_schema.clone(), infer_column_name_strategy);
-    refuse_header_collisions(&seed, &source_schema, &target_schema)?;
+    let target_schema = adapt_seed_schema(&seed, &source_schema, ctx.adapter_type, &[])?;
     let schema =
         dialect_adapted_schema(&target_schema, logical_fields.as_ref(), type_ops.as_ref())?;
     ctx.schema_cache
@@ -194,10 +182,10 @@ async fn register_seed_parquet_async(
 /// Pre-register scheduled seeds before the task graph runs.
 /// (CSV, JSON are on blocking workers; parquet is async)
 ///
-/// An error does not abort the run: it is recorded against its seed
-/// ([`registration_error`]), and that seed's render fails with it — so
-/// the reason is the seed's own result, the other seeds and models still run, and a
-/// schema an earlier run registered for the seed cannot stand in for this one.
+/// An error does not abort the run. It is returned against its seed, for the run's
+/// `TaskRunnerCtxInner::seed_registration_errors`, and that seed's render fails with it.
+/// So the reason is the seed's own result, the other seeds and models still run, and
+/// a schema an earlier run registered for the seed cannot stand in for this one.
 #[allow(clippy::too_many_arguments)]
 pub async fn pre_register_seeds(
     sorted_nodes: &[&String],
@@ -207,13 +195,7 @@ pub async fn pre_register_seeds(
     data_store: Arc<dyn DataStoreTrait>,
     type_ops: Arc<dyn TypeOps>,
     in_dir: &Path,
-) -> Vec<RegisteredSeed> {
-    // This run's errors only: a seed fixed since an earlier run in the same process
-    // (a browser tab runs many) must not fail on that run's error.
-    registration_errors()
-        .lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .clear();
+) -> (Vec<RegisteredSeed>, Vec<(String, Box<FsError>)>) {
     let ctx = Arc::new(SeedRegistrationCtx {
         adapter_type,
         schema_cache,
@@ -276,48 +258,24 @@ pub async fn pre_register_seeds(
     }
 
     let mut results = Vec::with_capacity(handles.len());
+    let mut errors = Vec::new();
     for (unique_id, handle) in handles {
         match handle.await {
             Ok(Ok(registered)) => results.push(registered),
-            // Recorded against the seed, whose render fails with it — said once, there.
-            Ok(Err(e)) => {
-                registration_errors()
-                    .lock()
-                    .unwrap_or_else(|p| p.into_inner())
-                    .insert(unique_id, (e.code, e.context.clone()));
-            }
+            // Returned against the seed, whose render fails with it — said once, there,
+            // as it was raised (its location and causes with it).
+            Ok(Err(e)) => errors.push((unique_id, e)),
             // A registration that panicked failed too: not left to an earlier schema.
-            Err(join_err) => {
-                registration_errors()
-                    .lock()
-                    .unwrap_or_else(|p| p.into_inner())
-                    .insert(
-                        unique_id,
-                        (
-                            ErrorCode::FailedToRegisterSeedTable,
-                            format!("seed registration panicked: {join_err}"),
-                        ),
-                    );
-            }
+            Err(join_err) => errors.push((
+                unique_id,
+                fs_err!(
+                    ErrorCode::FailedToRegisterSeedTable,
+                    "seed registration panicked: {join_err}"
+                ),
+            )),
         }
     }
-    results
-}
-
-type RegistrationErrors = std::sync::Mutex<std::collections::HashMap<String, (ErrorCode, String)>>;
-
-fn registration_errors() -> &'static RegistrationErrors {
-    static ERRORS: std::sync::OnceLock<RegistrationErrors> = std::sync::OnceLock::new();
-    ERRORS.get_or_init(Default::default)
-}
-
-/// The error this run's registration of the seed `unique_id` failed with, if it did.
-pub fn registration_error(unique_id: &str) -> Option<dbt_common::FsError> {
-    registration_errors()
-        .lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .get(unique_id)
-        .map(|(code, context)| *fs_err!(*code, "{context}"))
+    (results, errors)
 }
 
 fn parse_provided_types(
@@ -412,74 +370,163 @@ pub fn dialect_adapted_schema(
     Ok(adapted_schema)
 }
 
-/// Refuse a seed whose header names two columns the same once adapted — folded
-/// (`Id`, `ID` under `quote_columns: false`) or trimmed (`id`, ` id`): written on, the
-/// two fields share a name, and the agate table the seed's materialization reads keeps
-/// only one — a column lost without a word (ferrion #533). Named by both spellings, as
-/// the header has them, and by what made them one.
-fn refuse_header_collisions(seed: &DbtSeed, source: &Schema, folded: &Schema) -> FsResult<()> {
-    // Every group of colliding names at once, so one fix of the header settles them.
-    let groups = header_collisions(source, folded);
+/// The seed's columns as the adapter will name them, refused if two of them would be one
+/// column. Every seed format goes through here, so none skips the check.
+///
+/// Two header names are one column when they are equal once adapted. That means trimmed
+/// (`id`, ` id`), folded under `quote_columns: false` (`Id`, `ID`), or, on an adapter
+/// that compares names without case even when they are quoted (DuckDB), equal in all but
+/// case. Written on, such columns share a name, and the agate table the seed's
+/// materialization reads keeps only one of them: a column is lost without a word
+/// (ferrion #533, #552). Every group is named at once, so one fix of the header settles
+/// them. Each name is given as the header writes it (`header`, when the reader has it).
+fn adapt_seed_schema(
+    seed: &DbtSeed,
+    source: &SchemaRef,
+    adapter_type: AdapterType,
+    header: &[String],
+) -> FsResult<SchemaRef> {
+    let strategy = infer_seed_column_name_strategy(seed.__seed_attr__.quote_columns, adapter_type);
+    let adapted = adapt_schema(source.clone(), strategy);
+    let folds = !matches!(strategy, InferColumnNameStrategy::Verbatim);
+    let groups = header_collisions(source, &adapted, ignores_case(adapter_type));
     if groups.is_empty() {
-        return Ok(());
+        return Ok(adapted);
     }
+    let written = |i: usize| {
+        header
+            .get(i)
+            .filter(|_| header.len() == source.fields().len())
+    };
     Err(fs_err!(
         ErrorCode::FailedToRegisterSeedTable,
         "seed {}: {}; rename all but one of each in the header",
         seed.__common_attr__.name,
         groups
             .iter()
-            .map(|(spellings, name)| collision_message(spellings, name))
+            .map(|group| {
+                let spellings: Vec<Spelling> = group
+                    .columns
+                    .iter()
+                    .map(|&i| Spelling {
+                        read: source.field(i).name().clone(),
+                        written: written(i).cloned(),
+                    })
+                    .collect();
+                collision_message(&spellings, &group.name, folds)
+            })
             .collect::<Vec<_>>()
             .join("; ")
     ))
 }
 
-/// What one collision is: the header's spellings, the name they share, and what made
-/// them one (folding under `quote_columns: false`, trimming, or both).
-fn collision_message(spellings: &[String], name: &str) -> String {
-    let quoted: Vec<String> = spellings.iter().map(|s| format!("{s:?}")).collect();
-    if spellings.iter().all(|s| s == &spellings[0]) {
+/// Whether the adapter compares column names without case even when they are quoted:
+/// there, `"Id"` and `"ID"` are one column, as no unquoted name could tell them apart.
+fn ignores_case(adapter_type: AdapterType) -> bool {
+    matches!(adapter_type, AdapterType::DuckDB)
+}
+
+/// One header name in a collision: as the reader named it, and as the header writes
+/// it when that differs (the reader renames a repeat, `id,id` to `id`, `id_2`).
+struct Spelling {
+    read: String,
+    written: Option<String>,
+}
+
+impl Spelling {
+    fn display(&self) -> String {
+        match &self.written {
+            Some(written) if written != &self.read => {
+                format!("{written:?} (a repeat, which dbt reads as {:?})", self.read)
+            }
+            _ => format!("{:?}", self.read),
+        }
+    }
+}
+
+/// What one collision is: the header's names, the column they become, and what made
+/// them one (trimming, folding under `quote_columns: false`, or a case-blind adapter).
+fn collision_message(spellings: &[Spelling], name: &str, folds: bool) -> String {
+    let read: Vec<&str> = spellings.iter().map(|s| s.read.as_str()).collect();
+    let shown: Vec<String> = spellings.iter().map(Spelling::display).collect();
+    if read.iter().all(|s| *s == read[0]) {
         return format!(
             "column {} appears {} times in the header",
-            quoted[0],
+            shown[0],
             spellings.len()
         );
     }
-    let trimmed = spellings.iter().any(|s| s.trim() != s);
-    let folded = spellings.iter().any(|s| s.trim() != spellings[0].trim());
-    let how = match (trimmed, folded) {
-        (true, true) => "once their names are trimmed and folded (quote_columns: false)",
-        (true, false) => "once their names are trimmed",
-        _ => "once their names are folded (quote_columns: false)",
-    };
-    let list = match quoted.as_slice() {
+    let trimmed = read.iter().any(|s| s.trim() != *s);
+    let cased = read.iter().any(|s| s.trim() != read[0].trim());
+    let list = match shown.as_slice() {
         [a, b] => format!("{a} and {b}"),
         [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
         [] => String::new(),
     };
     let verb = if spellings.len() == 2 { "both" } else { "all" };
-    format!("columns {list} are {verb} {name:?} {how}")
+    match (trimmed, cased, folds) {
+        (_, true, false) => format!(
+            "columns {list} are one column {}to DuckDB, which compares names without case \
+             even when they are quoted",
+            if trimmed { "once trimmed, " } else { "" }
+        ),
+        (true, true, true) => format!(
+            "columns {list} are {verb} {name:?} once their names are trimmed and folded \
+             (quote_columns: false)"
+        ),
+        (true, false, _) => {
+            format!("columns {list} are {verb} {name:?} once their names are trimmed")
+        }
+        _ => format!(
+            "columns {list} are {verb} {name:?} once their names are folded (quote_columns: false)"
+        ),
+    }
 }
 
-/// Every name the adapted schema gives more than one header name, in header order:
-/// (the header's spellings, the name they share).
-fn header_collisions(source: &Schema, folded: &Schema) -> Vec<(Vec<String>, String)> {
-    let mut groups: Vec<(Vec<String>, String)> = Vec::new();
-    for (original, field) in source.fields().iter().zip(folded.fields().iter()) {
-        match groups.iter_mut().find(|(_, name)| name == field.name()) {
-            Some((spellings, _)) => spellings.push(original.name().clone()),
-            None => groups.push((vec![original.name().clone()], field.name().clone())),
+/// A column name the adapted schema gives more than one header name.
+#[derive(Debug, PartialEq)]
+struct Collision {
+    /// The adapted name of the group's first column.
+    name: String,
+    /// The group's columns, by position, in header order.
+    columns: Vec<usize>,
+}
+
+/// Every name the adapted schema gives more than one header name, in header order.
+/// Names are compared as the adapter compares them: without case when `ignores_case`.
+fn header_collisions(source: &Schema, adapted: &Schema, ignores_case: bool) -> Vec<Collision> {
+    debug_assert_eq!(source.fields().len(), adapted.fields().len());
+    let key = |name: &str| {
+        if ignores_case {
+            name.to_lowercase()
+        } else {
+            name.to_string()
+        }
+    };
+    let mut groups: Vec<(String, Collision)> = Vec::new();
+    for (i, field) in adapted.fields().iter().enumerate() {
+        let k = key(field.name());
+        match groups.iter_mut().find(|(gk, _)| *gk == k) {
+            Some((_, group)) => group.columns.push(i),
+            None => groups.push((
+                k,
+                Collision {
+                    name: field.name().clone(),
+                    columns: vec![i],
+                },
+            )),
         }
     }
-    groups.retain(|(spellings, _)| spellings.len() > 1);
     groups
+        .into_iter()
+        .map(|(_, group)| group)
+        .filter(|group| group.columns.len() > 1)
+        .collect()
 }
 
 #[cfg(test)]
 mod folded_collision_tests {
     use super::*;
-    use dbt_df_providers::seed_io::InferColumnNameStrategy;
 
     fn schema(names: &[&str]) -> Arc<Schema> {
         Arc::new(Schema::new(
@@ -490,88 +537,148 @@ mod folded_collision_tests {
         ))
     }
 
+    /// The groups, as (the header's names, the column they become).
+    fn groups(
+        names: &[&str],
+        strategy: InferColumnNameStrategy,
+        ignores_case: bool,
+    ) -> Vec<(Vec<String>, String)> {
+        let source = schema(names);
+        let adapted = adapt_schema(source.clone(), strategy);
+        header_collisions(&source, &adapted, ignores_case)
+            .into_iter()
+            .map(|g| {
+                let names = g.columns.iter().map(|&i| names[i].to_string()).collect();
+                (names, g.name)
+            })
+            .collect()
+    }
+
+    fn pair(a: &[&str], name: &str) -> (Vec<String>, String) {
+        (a.iter().map(|s| s.to_string()).collect(), name.to_string())
+    }
+
     #[test]
     fn a_folded_pair_is_found_with_both_spellings() {
-        let source = schema(&["Id", "name", "ID"]);
-        let folded = adapt_schema(source.clone(), InferColumnNameStrategy::Lowercase);
+        use InferColumnNameStrategy::*;
         assert_eq!(
-            header_collisions(&source, &folded),
-            vec![(vec!["Id".into(), "ID".into()], "id".into())]
+            groups(&["Id", "name", "ID"], Lowercase, false),
+            vec![pair(&["Id", "ID"], "id")]
         );
         // Snowflake folds up: the same pair collides there too.
-        let upper = adapt_schema(source.clone(), InferColumnNameStrategy::Uppercase);
         assert_eq!(
-            header_collisions(&source, &upper),
-            vec![(vec!["Id".into(), "ID".into()], "ID".into())]
+            groups(&["Id", "name", "ID"], Uppercase, false),
+            vec![pair(&["Id", "ID"], "ID")]
         );
     }
 
     #[test]
-    fn every_pair_is_found_at_once() {
-        let source = schema(&["Id", "ID", "Name", "NAME"]);
-        let folded = adapt_schema(source.clone(), InferColumnNameStrategy::Lowercase);
+    fn every_group_is_found_at_once() {
+        use InferColumnNameStrategy::*;
         assert_eq!(
-            header_collisions(&source, &folded),
-            vec![
-                (vec!["Id".into(), "ID".into()], "id".into()),
-                (vec!["Name".into(), "NAME".into()], "name".into()),
-            ]
+            groups(&["Id", "ID", "Name", "NAME"], Lowercase, false),
+            vec![pair(&["Id", "ID"], "id"), pair(&["Name", "NAME"], "name")]
         );
+        assert_eq!(
+            groups(&["Id", "ID", "iD"], Lowercase, false),
+            vec![pair(&["Id", "ID", "iD"], "id")]
+        );
+    }
+
+    #[test]
+    fn quoted_names_differing_in_case_collide_only_where_case_is_ignored() {
+        use InferColumnNameStrategy::*;
+        assert_eq!(groups(&["Id", "ID"], Verbatim, false), vec![]);
+        assert_eq!(
+            groups(&["Id", "ID"], Verbatim, true),
+            vec![pair(&["Id", "ID"], "Id")]
+        );
+    }
+
+    #[test]
+    fn trimmed_and_case_groups_are_found_in_one_check() {
+        use InferColumnNameStrategy::*;
+        // #552: under the default quoting, the trimmed pair and the case pair are both
+        // named, not one a run.
+        assert_eq!(
+            groups(&["id", " id", "Name", "NAME"], Verbatim, true),
+            vec![pair(&["id", " id"], "id"), pair(&["Name", "NAME"], "Name")]
+        );
+        assert_eq!(
+            groups(&["id", " id"], Verbatim, false),
+            vec![pair(&["id", " id"], "id")]
+        );
+    }
+
+    fn message(read: &[&str], written: Option<&[&str]>, name: &str, folds: bool) -> String {
+        let spellings: Vec<Spelling> = read
+            .iter()
+            .enumerate()
+            .map(|(i, r)| Spelling {
+                read: r.to_string(),
+                written: written.map(|w| w[i].to_string()),
+            })
+            .collect();
+        collision_message(&spellings, name, folds)
     }
 
     #[test]
     fn the_message_says_what_made_the_names_one() {
-        let m = |s: &[&str], n: &str| {
-            collision_message(&s.iter().map(|x| x.to_string()).collect::<Vec<_>>(), n)
-        };
         assert_eq!(
-            m(&["Id", "ID"], "id"),
+            message(&["Id", "ID"], None, "id", true),
             "columns \"Id\" and \"ID\" are both \"id\" once their names are folded (quote_columns: false)"
         );
         assert_eq!(
-            m(&["Id", "ID", "iD"], "id"),
+            message(&["Id", "ID", "iD"], None, "id", true),
             "columns \"Id\", \"ID\" and \"iD\" are all \"id\" once their names are folded (quote_columns: false)"
         );
         assert_eq!(
-            m(&["id", " id"], "id"),
+            message(&["id", " id"], None, "id", false),
             "columns \"id\" and \" id\" are both \"id\" once their names are trimmed"
         );
         assert_eq!(
-            m(&["Id", " id"], "id"),
+            message(&["Id", " id"], None, "id", true),
             "columns \"Id\" and \" id\" are both \"id\" once their names are trimmed and folded (quote_columns: false)"
         );
         assert_eq!(
-            m(&["id", "id"], "id"),
+            message(&["Id", "ID"], None, "Id", false),
+            "columns \"Id\" and \"ID\" are one column to DuckDB, which compares names without case even when they are quoted"
+        );
+        assert_eq!(
+            message(&["Id", " ID"], None, "Id", false),
+            "columns \"Id\" and \" ID\" are one column once trimmed, to DuckDB, which compares names without case even when they are quoted"
+        );
+        assert_eq!(
+            message(&["id", "id"], None, "id", false),
             "column \"id\" appears 2 times in the header"
         );
     }
 
     #[test]
-    fn three_spellings_are_one_group() {
-        let source = schema(&["Id", "ID", "iD"]);
-        let folded = adapt_schema(source.clone(), InferColumnNameStrategy::Lowercase);
+    fn a_repeat_the_reader_renamed_is_named_as_written() {
+        // `id,id,ID_2` under quote_columns: false: the reader names the second `id`
+        // `id_2`, which then folds onto `ID_2`. The header never says `id_2`.
         assert_eq!(
-            header_collisions(&source, &folded),
-            vec![(vec!["Id".into(), "ID".into(), "iD".into()], "id".into())]
+            message(&["id_2", "ID_2"], Some(&["id", "ID_2"]), "id_2", true),
+            "columns \"id\" (a repeat, which dbt reads as \"id_2\") and \"ID_2\" are both \"id_2\" once their names are folded (quote_columns: false)"
         );
     }
 
     #[test]
-    fn verbatim_names_differing_in_case_do_not_collide_and_trimmed_ones_do() {
-        let source = schema(&["Id", "ID"]);
-        let verbatim = adapt_schema(source.clone(), InferColumnNameStrategy::Verbatim);
-        assert_eq!(header_collisions(&source, &verbatim), vec![]);
-        let twice = schema(&["id", "id"]);
-        let kept = adapt_schema(twice.clone(), InferColumnNameStrategy::Verbatim);
-        assert_eq!(
-            header_collisions(&twice, &kept),
-            vec![(vec!["id".into(), "id".into()], "id".into())]
-        );
-        let padded = schema(&["id", " id"]);
-        let trimmed = adapt_schema(padded.clone(), InferColumnNameStrategy::Verbatim);
-        assert_eq!(
-            header_collisions(&padded, &trimmed),
-            vec![(vec!["id".into(), " id".into()], "id".into())]
-        );
+    fn the_csv_reader_keeps_the_header_as_written() {
+        let dir = std::env::temp_dir().join(format!("seed-header-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("dup.csv");
+        std::fs::write(&path, "id,id,ID_2\n1,2,3\n").unwrap();
+        let read = read_to_arrow_records(&path, &CustomCsvOptions::default()).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        let names: Vec<&str> = read
+            .schema
+            .fields()
+            .iter()
+            .map(|f| f.name().as_str())
+            .collect();
+        assert_eq!(names, ["id", "id_2", "ID_2"]);
+        assert_eq!(read.header, ["id", "id", "ID_2"]);
     }
 }

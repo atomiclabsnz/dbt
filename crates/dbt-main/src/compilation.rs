@@ -2227,7 +2227,7 @@ impl DbtProjectCompilation {
                     task_runner.show_taskgraph(&graph);
                 }
 
-                task_runner
+                let seed_registration_errors = task_runner
                     .register_seeds_for_selected_ids(run_task_args.as_ref(), &schedule)
                     .await?;
 
@@ -2241,6 +2241,11 @@ impl DbtProjectCompilation {
                         freshness_results,
                     )
                     .await?;
+
+                // This run's failed registrations, for each seed's render to fail with.
+                for (unique_id, error) in seed_registration_errors {
+                    ctx.inner.seed_registration_errors.insert(unique_id, error);
+                }
 
                 // Cheap clone (all fields are `Arc`s): keeps a handle to the
                 // run's telemetry state even if `run` drops `ctx` on an early
