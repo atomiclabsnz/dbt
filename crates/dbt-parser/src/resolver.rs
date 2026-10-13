@@ -5,7 +5,7 @@ use dbt_common::FsError;
 use dbt_common::cancellation::CancellationToken;
 use dbt_common::constants::DBT_GENERIC_TESTS_DIR_NAME;
 use dbt_common::io_args::FsCommand;
-use dbt_common::once_cell_vars::DISPATCH_CONFIG;
+use dbt_common::once_cell_vars::dispatch_config;
 use dbt_common::path::DbtPath;
 use dbt_common::stdfs;
 use dbt_common::tracing::dbt_emit::{emit_error_log_from_fs_error, emit_warn_log_from_fs_error};
@@ -678,7 +678,7 @@ pub async fn resolve_inner(
         root_package_name,
         package.dbt_project.name.as_str(),
         &macros.docs_macros,
-        DISPATCH_CONFIG.get().unwrap().read().unwrap().clone(),
+        dispatch_config(),
         namespace_keys,
     );
     // Resolve the dbt properties (schema.yml) files

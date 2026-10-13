@@ -12,7 +12,7 @@ use crate::phases::compile::DependencyValidationConfig;
 use dbt_adapter::Adapter;
 use dbt_adapter::load_store::ResultStore;
 use dbt_adapter::relation::RelationObject;
-use dbt_common::once_cell_vars::DISPATCH_CONFIG;
+use dbt_common::once_cell_vars::dispatch_config;
 use dbt_schemas::filter::{RunFilter, Sample};
 use dbt_schemas::schemas::Nodes;
 use dbt_schemas::state::{DbtRuntimeConfig, NodeResolverTracker};
@@ -54,17 +54,10 @@ pub fn build_compile_base_ctx(
     // type must be exactly that, not the `MutableVec<Value>` that
     // serde-serializing a `Vec<String>` produces. Same downcast contract as
     // `ResolveBaseCtx::macro_dispatch_order`.
-    let macro_dispatch_order: BTreeMap<String, MinijinjaValue> = DISPATCH_CONFIG
-        .get()
-        .map(|macro_dispatch_order| {
-            macro_dispatch_order
-                .read()
-                .unwrap()
-                .iter()
-                .map(|(k, v)| (k.clone(), MinijinjaValue::from(v.clone())))
-                .collect()
-        })
-        .unwrap_or_default();
+    let macro_dispatch_order: BTreeMap<String, MinijinjaValue> = dispatch_config()
+        .into_iter()
+        .map(|(k, v)| (k, MinijinjaValue::from(v)))
+        .collect();
 
     // Create a BTreeMap for builtins
     let mut builtins = BTreeMap::new();

@@ -839,28 +839,22 @@ impl DbtProjectCompilation {
         };
 
         // selectors.yml renders with the project's dispatch order, which the loader sets.
-        // A reused state skips the loader, so it is set here, from this project's
-        // dbt_project.yml as the loader would — whatever an earlier run in the process
-        // left (#561); an unreadable project leaves it empty, which is what a project
-        // without `dispatch:` has.
-        {
-            let path = arg.io.in_dir.join(dbt_common::constants::DBT_PROJECT_YML);
-            let dispatch = dbt_loader::dbt_project_yml_loader::load_project_yml(
-                jinja_env,
-                &path,
-                None,
-                arg.vars.clone(),
-            )
-            .ok()
-            .and_then(|(project, _)| project.dispatch)
-            .map(|configs| {
-                configs
-                    .into_iter()
-                    .map(|config| (config.macro_namespace, config.search_order))
-                    .collect()
-            })
-            .unwrap_or_default();
-            dbt_common::once_cell_vars::set_dispatch_config(dispatch);
+        // A reused state skips the loader and keeps no `dispatch:` of its own (its
+        // project is a stub), so it is set here from this project's dbt_project.yml,
+        // whatever an earlier run in the process left (#561). On a render failure it is
+        // left as it is: the run's own load already set it, or the project does not
+        // load at all.
+        let path = arg.io.in_dir.join(dbt_common::constants::DBT_PROJECT_YML);
+        match dbt_loader::dbt_project_yml_loader::load_project_yml(
+            jinja_env,
+            &path,
+            None,
+            arg.vars.clone(),
+        ) {
+            Ok((project, _)) => dbt_common::once_cell_vars::set_dispatch_config(
+                dbt_loader::dbt_project_yml_loader::dispatch_order(&project),
+            ),
+            Err(e) => tracing::warn!("dispatch order not re-read from dbt_project.yml: {e}"),
         }
 
         let resolve_args = ResolveArgs::try_from_eval_args(arg)?;

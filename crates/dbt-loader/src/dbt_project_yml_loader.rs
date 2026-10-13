@@ -254,3 +254,15 @@ pub fn collect_protected_paths(dbt_project: &DbtProject) -> Vec<String> {
 
     result
 }
+
+/// A project's `dispatch:` order: macro namespace → search order; empty when it
+/// declares none. The one place it is read from a [`DbtProject`], for every writer of
+/// the process's dispatch order (ferrion #561).
+pub fn dispatch_order(project: &DbtProject) -> BTreeMap<String, Vec<String>> {
+    project
+        .dispatch
+        .iter()
+        .flatten()
+        .map(|config| (config.macro_namespace.clone(), config.search_order.clone()))
+        .collect()
+}

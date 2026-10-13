@@ -295,7 +295,8 @@ pub async fn resolve_seeds(
         // spelling survives only quoted. Set on the config, not only the seed's
         // attributes: the seed macros quote by `config.quote_columns`, and the column
         // names dbt reads the CSV with follow the attribute.
-        if matches!(adapter_type, AdapterType::DuckDB) && properties_config.quote_columns.is_none() {
+        if matches!(adapter_type, AdapterType::DuckDB) && properties_config.quote_columns.is_none()
+        {
             properties_config.quote_columns = Some(true);
         }
         let is_enabled = properties_config.enabled;

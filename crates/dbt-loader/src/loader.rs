@@ -376,18 +376,14 @@ pub async fn load(
         //    separately by prepare_inline_sql after this block, into a dedicated "" package
         //    (appended to dbt_state.packages), never into the root package.
         let new_root_package = if arg.inline_sql.is_some() {
-            {
-                let dbt_project_path = arg.io.in_dir.join(DBT_PROJECT_YML);
-                if let Ok((proj, _)) =
-                    load_project_yml(&env, &dbt_project_path, None, arg.vars.clone())
-                {
-                    let map = proj.dispatch.as_ref().map_or_else(BTreeMap::new, |d| {
-                        d.iter()
-                            .map(|dc| (dc.macro_namespace.clone(), dc.search_order.clone()))
-                            .collect()
-                    });
-                    dbt_common::once_cell_vars::set_dispatch_config(map);
-                }
+            let dbt_project_path = arg.io.in_dir.join(DBT_PROJECT_YML);
+            match load_project_yml(&env, &dbt_project_path, None, arg.vars.clone()) {
+                Ok((project, _)) => dbt_common::once_cell_vars::set_dispatch_config(
+                    crate::dbt_project_yml_loader::dispatch_order(&project),
+                ),
+                // Left as it is; a project whose dbt_project.yml does not render does not
+                // load, so this run fails before anything dispatches.
+                Err(e) => tracing::warn!("dispatch order not re-read from dbt_project.yml: {e}"),
             }
             let pkg_name = &prev_root_package.dbt_project.name;
             let in_dir = &arg.io.in_dir;
@@ -907,19 +903,7 @@ pub async fn load_inner(
     load_vars(&dbt_project.name, vars_for_load, collected_vars)?;
     // Set dispatch config for future use
     if package_path == arg.io.in_dir {
-        let dispatch_config_map = if let Some(dispatch_configs) = dbt_project.dispatch.clone() {
-            dispatch_configs
-                .iter()
-                .map(|dispatch_config| {
-                    (
-                        dispatch_config.macro_namespace.clone(),
-                        dispatch_config.search_order.clone(),
-                    )
-                })
-                .collect()
-        } else {
-            BTreeMap::new()
-        };
+        let dispatch_config_map = crate::dbt_project_yml_loader::dispatch_order(&dbt_project);
         // This project's dispatch order, replacing an earlier load's in the same process
         // (ferrion #561: it used to be set on the first load only, so a second project
         // in one process dispatched in the first one's order).

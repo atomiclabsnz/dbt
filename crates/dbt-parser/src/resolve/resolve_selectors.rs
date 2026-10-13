@@ -1,5 +1,5 @@
 use dbt_common::node_selector::SelectExpression;
-use dbt_common::once_cell_vars::DISPATCH_CONFIG;
+use dbt_common::once_cell_vars::dispatch_config;
 use dbt_common::{ErrorCode, FsResult, err, fs_err};
 use dbt_jinja_utils::jinja_environment::JinjaEnv;
 use dbt_jinja_utils::phases::parse::build_resolve_context;
@@ -160,7 +160,7 @@ fn load_and_parse_selectors_file(
         root_package_name,
         root_package_name,
         &BTreeMap::new(),
-        DISPATCH_CONFIG.get().unwrap().read().unwrap().clone(),
+        dispatch_config(),
         namespace_keys,
     );
 
@@ -247,7 +247,7 @@ fn render_default_template(
         root_package_name,
         root_package_name,
         &BTreeMap::new(),
-        DISPATCH_CONFIG.get().unwrap().read().unwrap().clone(),
+        dispatch_config(),
         namespace_keys,
     );
     let rendered = jinja_env.render_str(template, &context, &[]).map_err(|e| {
