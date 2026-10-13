@@ -234,14 +234,40 @@ impl Format {
         max_records: Option<usize>,
         text_columns: &[String],
     ) -> Result<(crate::type_tester::AgateSchema, usize, Vec<String>), ArrowError> {
+        self.infer_agate_schema_and_header(reader, max_records, text_columns)
+            .map(|(schema, count, missing, _)| (schema, count, missing))
+    }
+
+    /// [`infer_agate_schema_with_text_columns`](Self::infer_agate_schema_with_text_columns),
+    /// also answering the header row as the file writes it — before an empty name is
+    /// given a letter or a repeated one a suffix (`id,id` is read as `id`, `id_2`) — from
+    /// the same parse, so it lines up with the schema's columns. Empty when the file has
+    /// no header row.
+    #[allow(clippy::type_complexity)]
+    pub fn infer_agate_schema_and_header<R: Read>(
+        &self,
+        reader: R,
+        max_records: Option<usize>,
+        text_columns: &[String],
+    ) -> Result<
+        (
+            crate::type_tester::AgateSchema,
+            usize,
+            Vec<String>,
+            Vec<String>,
+        ),
+        ArrowError,
+    > {
         use crate::type_tester::{AgateSchema, AgateType, TypeTester};
 
         let mut csv_reader = self.build_reader(reader);
 
         // get or create header names
+        let mut written = Vec::new();
         let headers: Vec<String> = if self.header {
             let headers = &csv_reader.headers().map_err(map_csv_error)?.clone();
-            headers.iter().map(|s| s.to_string()).collect()
+            written = headers.iter().map(|s| s.to_string()).collect();
+            written.clone()
         } else {
             // No header row - generate letter names like agate does
             // This matches agate's behavior: tuple(utils.letter_name(i) for i in range(len(rows[0])))
@@ -312,7 +338,7 @@ impl Format {
             .collect();
         let agate_schema = AgateSchema::from_names_and_types(headers, types);
 
-        Ok((agate_schema, records_count, missing_columns))
+        Ok((agate_schema, records_count, missing_columns, written))
     }
 
     /// Deduplicate column names matching agate's utils.deduplicate behavior.

@@ -28,11 +28,18 @@ pub fn run_seed_render(
     let unique_id = &node.common().unique_id;
     if let Some((_, e)) = ctx.inner.seed_registration_errors.remove(unique_id) {
         record_errored(&ctx, unique_id, e.to_string());
+        ctx.inner
+            .seed_registration_failed
+            .insert(unique_id.clone(), ());
         return Err(e);
+    }
+    // Its error was taken by an earlier render of it this run: failed again, said once.
+    if ctx.inner.seed_registration_failed.contains_key(unique_id) {
+        return Ok(NodeStatus::Errored);
     }
     if !ctx.schema_cache.exists(&cfqn) {
         // Not registered, and no error recorded for it (a seed not scheduled for
-        // registration): failed without a second message.
+        // registration): failed, and recorded as not registered.
         record_errored(
             &ctx,
             unique_id,

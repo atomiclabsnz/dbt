@@ -163,7 +163,7 @@ pub fn read_to_arrow_records(
     // Pass text_columns to force those columns as Text type
     let format = Format::new(options.delimiter, has_header, options.disambiguate_header)
         .with_truncated_rows(true);
-    let (agate_schema, _, unmatched_text_columns) = format.infer_agate_schema_with_text_columns(
+    let (agate_schema, _, unmatched_text_columns, header) = format.infer_agate_schema_and_header(
         Cursor::new(data_for_processing),
         options.max_records_for_inference,
         &options.text_columns,
@@ -180,18 +180,6 @@ pub fn read_to_arrow_records(
             .build(Cursor::new(data_for_processing))?;
 
     let batches = reader.collect::<Result<Vec<_>, _>>()?;
-
-    let header = if has_header {
-        csv::ReaderBuilder::new()
-            .delimiter(options.delimiter)
-            .flexible(true)
-            .from_reader(Cursor::new(data_for_processing))
-            .headers()
-            .map(|h| h.iter().map(str::to_string).collect())
-            .unwrap_or_default()
-    } else {
-        Vec::new()
-    };
 
     Ok(CsvReadResult {
         schema,

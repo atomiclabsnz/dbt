@@ -186,6 +186,10 @@ pub struct TaskRunnerCtxInner {
     /// task graph runs. A seed's render takes its error out and fails with it. The
     /// map belongs to this run, so another run in the same process cannot see it.
     pub seed_registration_errors: DashMap<String, Box<dbt_common::FsError>>,
+    /// Each seed whose registration error a render has taken out of
+    /// `seed_registration_errors`: a second render of it this run fails too, rather
+    /// than finding a schema an earlier run registered.
+    pub seed_registration_failed: DashMap<String, ()>,
     /// Captured show batches for the LSP preview path; set by run_show, collected after the task loop.
     pub preview_results: parking_lot::Mutex<Option<(Vec<RecordBatch>, SchemaRef)>>,
     /// Error from a failed show query; set by run_show when execution fails, collected after the task loop.
@@ -268,6 +272,7 @@ impl TaskRunnerCtxInner {
             generic_test_relationships,
             span_manager,
             seed_registration_errors: DashMap::default(),
+            seed_registration_failed: DashMap::default(),
             preview_results: parking_lot::Mutex::new(None),
             preview_error: parking_lot::Mutex::new(None),
             run_cache_ctx,

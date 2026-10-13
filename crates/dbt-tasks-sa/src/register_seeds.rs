@@ -434,8 +434,16 @@ struct Spelling {
 }
 
 impl Spelling {
+    /// As the header writes it, and, where the reader renamed it, what it is read as: an
+    /// empty name is given a letter, a repeat a suffix.
     fn display(&self) -> String {
         match &self.written {
+            Some(written) if written.trim().is_empty() => {
+                format!(
+                    "{written:?} (an empty name, which dbt reads as {:?})",
+                    self.read
+                )
+            }
             Some(written) if written != &self.read => {
                 format!("{written:?} (a repeat, which dbt reads as {:?})", self.read)
             }
@@ -449,7 +457,7 @@ impl Spelling {
 fn collision_message(spellings: &[Spelling], name: &str, folds: bool) -> String {
     let read: Vec<&str> = spellings.iter().map(|s| s.read.as_str()).collect();
     let shown: Vec<String> = spellings.iter().map(Spelling::display).collect();
-    if read.iter().all(|s| *s == read[0]) {
+    if shown.iter().all(|s| *s == shown[0]) {
         return format!(
             "column {} appears {} times in the header",
             shown[0],
@@ -464,6 +472,11 @@ fn collision_message(spellings: &[Spelling], name: &str, folds: bool) -> String 
         [] => String::new(),
     };
     let verb = if spellings.len() == 2 { "both" } else { "all" };
+    if !trimmed && !cased {
+        // Equal as read, but not as written: the reader's rename made them one
+        // (`id,id,id_2` reads the second `id` as `id_2`).
+        return format!("columns {list} are {verb} {name:?} once dbt renames the header's names");
+    }
     match (trimmed, cased, folds) {
         (_, true, false) => format!(
             "columns {list} are one column {}to DuckDB, which compares names without case \
@@ -655,6 +668,21 @@ mod folded_collision_tests {
     }
 
     #[test]
+    fn an_empty_name_is_not_called_a_repeat_and_a_rename_onto_a_name_is_named() {
+        // `B,` folded: the reader letters the empty name `b`, onto `B`'s fold.
+        assert_eq!(
+            message(&["B", "b"], Some(&["B", ""]), "b", true),
+            "columns \"B\" and \"\" (an empty name, which dbt reads as \"b\") are both \"b\" once their names are folded (quote_columns: false)"
+        );
+        // `id,id,id_2`: the second `id` is read as `id_2`, the name the header gives
+        // the third. Both are named as written.
+        assert_eq!(
+            message(&["id_2", "id_2"], Some(&["id", "id_2"]), "id_2", false),
+            "columns \"id\" (a repeat, which dbt reads as \"id_2\") and \"id_2\" are both \"id_2\" once dbt renames the header's names"
+        );
+    }
+
+    #[test]
     fn a_repeat_the_reader_renamed_is_named_as_written() {
         // `id,id,ID_2` under quote_columns: false: the reader names the second `id`
         // `id_2`, which then folds onto `ID_2`. The header never says `id_2`.
@@ -680,5 +708,12 @@ mod folded_collision_tests {
             .collect();
         assert_eq!(names, ["id", "id_2", "ID_2"]);
         assert_eq!(read.header, ["id", "id", "ID_2"]);
+        // ...and an empty name as empty, not as the letter it is read as.
+        let path = dir.join("empty.csv");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(&path, "B,\n1,2\n").unwrap();
+        let read = read_to_arrow_records(&path, &CustomCsvOptions::default()).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(read.header, ["B", ""]);
     }
 }
