@@ -834,16 +834,16 @@ impl DbtProjectCompilation {
         arg: &EvalArgs,
         jinja_env: &JinjaEnv,
     ) -> FsResult<()> {
-        use dbt_common::once_cell_vars::DISPATCH_CONFIG;
         use dbt_parser::resolve::resolve_selectors::{
             resolve_final_selectors, resolve_manifest_selectors, resolve_selectors_from_yaml,
         };
 
-        // selectors.yml renders with the project's dispatch order, which the loader sets
-        // once per process. A reused state skips the loader, so a fresh process sets it
-        // here, from dbt_project.yml as the loader would; an unreadable project leaves it
-        // empty, which is what a project without `dispatch:` has.
-        if DISPATCH_CONFIG.get().is_none() {
+        // selectors.yml renders with the project's dispatch order, which the loader sets.
+        // A reused state skips the loader, so it is set here, from this project's
+        // dbt_project.yml as the loader would — whatever an earlier run in the process
+        // left (#561); an unreadable project leaves it empty, which is what a project
+        // without `dispatch:` has.
+        {
             let path = arg.io.in_dir.join(dbt_common::constants::DBT_PROJECT_YML);
             let dispatch = dbt_loader::dbt_project_yml_loader::load_project_yml(
                 jinja_env,
@@ -860,7 +860,7 @@ impl DbtProjectCompilation {
                     .collect()
             })
             .unwrap_or_default();
-            DISPATCH_CONFIG.get_or_init(|| std::sync::RwLock::new(dispatch));
+            dbt_common::once_cell_vars::set_dispatch_config(dispatch);
         }
 
         let resolve_args = ResolveArgs::try_from_eval_args(arg)?;

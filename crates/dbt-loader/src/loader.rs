@@ -9,7 +9,6 @@ use dbt_common::constants::{
     DBT_CATALOGS_YML, DBT_DEPENDENCIES_YML, DBT_PACKAGES_LOCK_FILE, DBT_PACKAGES_YML, DBT_VARS_YML,
 };
 use dbt_common::io_args::{InternalPackageMode, ReplayMode, TimeMachineMode};
-use dbt_common::once_cell_vars::DISPATCH_CONFIG;
 use dbt_common::path::DbtPath;
 use dbt_common::tracing::TracingConfigProvider;
 use dbt_common::tracing::dbt_emit::{
@@ -41,7 +40,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::Instrument;
 
@@ -370,14 +369,14 @@ pub async fn load(
         // 3. No file deletions or renames happened between the previous run and this one.
         //    The inline path does NOT re-stat files; stale entries are harmless (resolver
         //    reads them, fails on missing file, and the error surfaces naturally).
-        // 4. DISPATCH_CONFIG may already be set from a prior run in the same process;
-        //    OnceLock::set silently no-ops if already set, which is correct (same binary,
-        //    same dispatch config).
+        // 4. DISPATCH_CONFIG is set from this project's dbt_project.yml every time, as a
+        //    full load sets it: a prior run in the same process may have been another
+        //    project (ferrion #561).
         // 5. The inline SQL file is NOT in prev_root_package.all_paths. It is injected
         //    separately by prepare_inline_sql after this block, into a dedicated "" package
         //    (appended to dbt_state.packages), never into the root package.
         let new_root_package = if arg.inline_sql.is_some() {
-            if DISPATCH_CONFIG.get().is_none() {
+            {
                 let dbt_project_path = arg.io.in_dir.join(DBT_PROJECT_YML);
                 if let Ok((proj, _)) =
                     load_project_yml(&env, &dbt_project_path, None, arg.vars.clone())
@@ -387,7 +386,7 @@ pub async fn load(
                             .map(|dc| (dc.macro_namespace.clone(), dc.search_order.clone()))
                             .collect()
                     });
-                    let _ = DISPATCH_CONFIG.set(RwLock::new(map));
+                    dbt_common::once_cell_vars::set_dispatch_config(map);
                 }
             }
             let pkg_name = &prev_root_package.dbt_project.name;
@@ -921,10 +920,10 @@ pub async fn load_inner(
         } else {
             BTreeMap::new()
         };
-        // Only set the dispatch config on first load of the project (mainly impacts testing).
-        // get_or_init synchronizes internally, so concurrent loads can't race between the
-        // check and the set.
-        DISPATCH_CONFIG.get_or_init(|| RwLock::new(dispatch_config_map));
+        // This project's dispatch order, replacing an earlier load's in the same process
+        // (ferrion #561: it used to be set on the first load only, so a second project
+        // in one process dispatched in the first one's order).
+        dbt_common::once_cell_vars::set_dispatch_config(dispatch_config_map);
     }
 
     let session_files = find_session_files(package_path)?;
