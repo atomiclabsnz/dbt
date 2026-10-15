@@ -623,11 +623,19 @@ pub struct ParseArgs {
     // Flattened Common args
     #[clap(flatten)]
     pub common_args: CommonArgs,
+
+    /// The SQL-analysis level the project is parsed under, which the parse records
+    /// in every node's config (ferrion #568). A host that runs its other commands at
+    /// one level gives it here too, so a parse saved by any of them is the one this
+    /// command would make.
+    #[arg(long, env = "DBT_STATIC_ANALYSIS")]
+    pub static_analysis: Option<StaticAnalysisKind>,
 }
 impl ParseArgs {
     pub fn to_eval_args(&self, arg: SystemArgs, in_dir: &Path, out_dir: &Path) -> EvalArgs {
         let mut eval_args = self.common_args.to_eval_args(arg, in_dir, out_dir);
         eval_args.phase = Phases::Parse;
+        eval_args.static_analysis = self.static_analysis;
         eval_args
     }
 }
@@ -1182,12 +1190,20 @@ pub struct ListArgs {
     /// Exclude nodes of a specific type;
     #[arg(long, num_args(1..), value_delimiter = ' ', aliases = ["exclude-resource-types"], env = "DBT_EXCLUDE_RESOURCE_TYPES")]
     pub exclude_resource_type: Option<Vec<ClapResourceType>>,
+
+    /// The SQL-analysis level the project is parsed under, which the parse records
+    /// in every node's config (ferrion #568). A host that runs its other commands at
+    /// one level gives it here too, so a parse saved by any of them is the one this
+    /// command would make.
+    #[arg(long, env = "DBT_STATIC_ANALYSIS")]
+    pub static_analysis: Option<StaticAnalysisKind>,
 }
 
 impl ListArgs {
     pub fn to_eval_args(&self, arg: SystemArgs, in_dir: &Path, out_dir: &Path) -> EvalArgs {
         let mut eval_args = self.common_args.to_eval_args(arg, in_dir, out_dir);
         eval_args.phase = Phases::List;
+        eval_args.static_analysis = self.static_analysis;
         eval_args.io.show.insert(ShowOptions::Nodes);
         eval_args.output_keys = self.output_keys.clone();
         if let Some(resource_type) = &self.resource_type {
