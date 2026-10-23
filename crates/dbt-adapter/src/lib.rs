@@ -60,6 +60,7 @@ pub mod load_store;
 
 pub use adapter::Adapter;
 pub use adapter::AdapterImpl;
+pub use adapter::adapter_impl::behavior_flags;
 pub use column::{Column, ColumnBuilder};
 pub use dbt_adapter_core::AdapterType;
 pub use errors::AdapterResult;
