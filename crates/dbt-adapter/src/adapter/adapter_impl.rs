@@ -5419,6 +5419,16 @@ pub(crate) static DEFAULT_BASE_BEHAVIOR_FLAGS: LazyLock<[BehaviorFlag; 4]> = Laz
     ]
 });
 
+/// Every behavior flag an adapter of `adapter_type` declares: its own, then the base ones —
+/// the list `make_behavior` builds an adapter's `Behavior` from. Public for a host that wraps
+/// an adapter and declares flags of its own beside these (ferrion's, for a target its engine
+/// writes in place), so the wrapped adapter's flags stay the ones dbt gives it.
+pub fn behavior_flags(adapter_type: AdapterType) -> Vec<BehaviorFlag> {
+    let mut flags = adapter_specific_behavior_flags(adapter_type);
+    flags.extend(DEFAULT_BASE_BEHAVIOR_FLAGS.iter().cloned());
+    flags
+}
+
 /// Get adapter-specific behavior flags for a given adapter type
 /// This is a standalone function to avoid needing to create adapter instances
 /// just to get the flags

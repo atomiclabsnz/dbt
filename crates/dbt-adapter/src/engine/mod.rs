@@ -1,4 +1,4 @@
-use crate::adapter::adapter_impl::{DEFAULT_BASE_BEHAVIOR_FLAGS, adapter_specific_behavior_flags};
+use crate::adapter::adapter_impl::behavior_flags;
 
 use arrow::array::RecordBatch;
 use dbt_adapter_core::AdapterType;
@@ -72,10 +72,7 @@ pub(crate) fn make_behavior(
     adapter_type: AdapterType,
     behavior_flag_overrides: &BTreeMap<String, bool>,
 ) -> Arc<Behavior> {
-    let mut behavior_flags = adapter_specific_behavior_flags(adapter_type);
-    for flag in DEFAULT_BASE_BEHAVIOR_FLAGS.iter() {
-        behavior_flags.push(flag.clone());
-    }
+    let behavior_flags = behavior_flags(adapter_type);
     for key in behavior_flag_overrides.keys() {
         if !behavior_flags.iter().any(|f| f.name == key)
             && REMOVED_IN_FUSION.contains(&key.as_str())
