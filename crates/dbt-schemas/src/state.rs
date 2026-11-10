@@ -648,6 +648,11 @@ pub struct ResolverState {
     pub defer_nodes: Option<Nodes>,
     /// Nodes that had resolution errors (e.g., unresolved refs/sources)
     pub nodes_with_resolution_errors: HashSet<String>,
+    /// The first resolution error of each node in `nodes_with_resolution_errors`, as dbt
+    /// prints it (`[DependencyNotFound (dbt1048)]: Ref 'x' not found …` and its `-->`
+    /// location), for that node's result. Empty after a partial parse that restored the set
+    /// from its cache, where the result falls back to "Compilation Error".
+    pub resolution_error_messages: HashMap<String, String>,
     /// Nodes whose SQL references models they are not permitted to access (group/access violations)
     pub nodes_with_access_errors: HashSet<String>,
     pub semantic_layer_spec_is_legacy: bool,

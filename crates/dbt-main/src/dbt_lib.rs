@@ -1232,7 +1232,16 @@ impl<'a> AllPhasesExecutor<'a> {
                                         end_time: now,
                                         status: dbt_common::stats::NodeStatus::Errored,
                                         thread_id: "main".to_string(),
-                                        message: Some("Compilation Error".to_string()),
+                                        // A node whose refs did not resolve says which
+                                        // and where (ferrion#766).
+                                        message: Some(
+                                            compilation
+                                                .resolved_state()
+                                                .resolution_error_messages
+                                                .get(uid)
+                                                .cloned()
+                                                .unwrap_or_else(|| "Compilation Error".to_string()),
+                                        ),
                                     })
                                     .collect(),
                                 nodes: Some(compilation.nodes().clone()),

@@ -261,6 +261,9 @@ pub fn try_load_prev_compilation(
         root_project_quoting,
         defer_nodes: None,
         nodes_with_resolution_errors: state.nodes_with_resolution_errors,
+        // Restored from the cache as ids only: a node's result falls back to
+        // "Compilation Error", and the log carries the reason (ferrion#766).
+        resolution_error_messages: Default::default(),
         nodes_with_access_errors: state.nodes_with_access_errors,
         semantic_layer_spec_is_legacy: false,
         test_name_truncations: Default::default(),

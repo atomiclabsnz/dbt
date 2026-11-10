@@ -342,7 +342,7 @@ pub async fn resolve(
 
     // take refs and sources, resolve them to a unique_id and put in depends_on
     // This returns a set of node IDs that had resolution errors (unresolved refs/sources)
-    let nodes_with_resolution_errors = resolve_dependencies(
+    let resolution_error_messages = resolve_dependencies(
         &mut nodes,
         &mut disabled_nodes,
         &mut operations,
@@ -410,7 +410,8 @@ pub async fn resolve(
             cloud_config: dbt_state.cloud_config.clone(),
             render_results: collector,
             run_started_at: dbt_state.run_started_at,
-            nodes_with_resolution_errors,
+            nodes_with_resolution_errors: resolution_error_messages.keys().cloned().collect(),
+            resolution_error_messages,
             nodes_with_access_errors,
             node_resolver: Arc::new(node_resolver),
             get_relation_calls,
