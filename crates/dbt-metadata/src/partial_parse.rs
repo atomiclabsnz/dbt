@@ -3873,6 +3873,7 @@ mod tests {
             root_project_quoting: Default::default(),
             defer_nodes: None,
             nodes_with_resolution_errors: Default::default(),
+            resolution_error_messages: Default::default(),
             nodes_with_access_errors: Default::default(),
             semantic_layer_spec_is_legacy: false,
             test_name_truncations: Default::default(),

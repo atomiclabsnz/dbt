@@ -886,17 +886,19 @@ impl NodeResolverTracker for NodeResolver {
 }
 
 /// Resolve the dependencies for a model
-/// Returns a set of node unique_ids that had resolution errors
+/// Returns the node unique_ids that had resolution errors, each with the first error it
+/// had as dbt prints it (code, message and `-->` location), so a node's result can say
+/// what failed and where rather than only that it did (ferrion#766).
 #[allow(clippy::cognitive_complexity)]
 pub fn resolve_dependencies(
     nodes: &mut Nodes,
     disabled_nodes: &mut Nodes,
     operations: &mut dbt_schemas::state::Operations,
     node_resolver: &NodeResolver,
-) -> HashSet<String> {
+) -> HashMap<String, String> {
     let mut tests_to_disable = Vec::new();
     let mut exposures_to_disable = Vec::new();
-    let mut nodes_with_errors = HashSet::new();
+    let mut nodes_with_errors: HashMap<String, String> = HashMap::new();
 
     // First pass: identify tests and exposures with disabled dependencies
     for node in nodes.iter_values_mut() {
@@ -973,8 +975,10 @@ pub fn resolve_dependencies(
                         emit_warn_log_from_fs_error(warning);
                     } else {
                         // Track this node as having an error (unresolved ref/source)
-                        nodes_with_errors.insert(node_unique_id.clone());
                         let err_with_loc = e.with_location(location);
+                        nodes_with_errors
+                            .entry(node_unique_id.clone())
+                            .or_insert_with(|| err_with_loc.pretty());
                         emit_error_log_from_fs_error(err_with_loc);
                     }
                 }
@@ -1018,8 +1022,10 @@ pub fn resolve_dependencies(
                         emit_warn_log_from_fs_error(warning);
                     } else {
                         // Track this node as having an error (unresolved ref/source)
-                        nodes_with_errors.insert(node_unique_id.clone());
                         let err_with_loc = e.with_location(location);
+                        nodes_with_errors
+                            .entry(node_unique_id.clone())
+                            .or_insert_with(|| err_with_loc.pretty());
                         emit_error_log_from_fs_error(err_with_loc);
                     }
                 }
@@ -1060,8 +1066,10 @@ pub fn resolve_dependencies(
                         emit_warn_log_from_fs_error(err_with_loc);
                     } else {
                         // Track this node as having an error (unresolved function)
-                        nodes_with_errors.insert(node_unique_id.clone());
                         let err_with_loc = e.with_location(location);
+                        nodes_with_errors
+                            .entry(node_unique_id.clone())
+                            .or_insert_with(|| err_with_loc.pretty());
                         emit_error_log_from_fs_error(err_with_loc);
                     }
                 }
@@ -1135,8 +1143,10 @@ pub fn resolve_dependencies(
                                 .push((dependency_id, location));
                         }
                         Err(e) => {
-                            nodes_with_errors.insert(operation_unique_id.clone());
                             let err_with_loc = e.with_location(location);
+                            nodes_with_errors
+                                .entry(operation_unique_id.clone())
+                                .or_insert_with(|| err_with_loc.pretty());
                             emit_error_log_from_fs_error(err_with_loc);
                         }
                     }
@@ -1176,8 +1186,10 @@ pub fn resolve_dependencies(
                                 }
                             }
                             Err(e) => {
-                                nodes_with_errors.insert(operation_unique_id.clone());
                                 let err_with_loc = e.with_location(location);
+                                nodes_with_errors
+                                    .entry(operation_unique_id.clone())
+                                    .or_insert_with(|| err_with_loc.pretty());
                                 emit_error_log_from_fs_error(err_with_loc);
                             }
                         }
@@ -1371,6 +1383,37 @@ mod tests {
             },
             ..Default::default()
         })
+    }
+
+    /// A model whose `ref` resolves to nothing is reported with the error itself — code,
+    /// message and location — so its result can say which ref and where, not only
+    /// "Compilation Error" (ferrion#766).
+    #[test]
+    fn a_missing_ref_is_kept_with_its_error_and_location() {
+        let mut model = (*make_model("model.test.zz", "zz", "test", None, vec![])).clone();
+        model.__common_attr__.path = std::path::PathBuf::from("models/zz.sql").into();
+        model.__base_attr__.enabled = true;
+        model.__base_attr__.refs = vec![DbtRef {
+            name: "stg_custmers".to_string(),
+            package: None,
+            version: None,
+            location: Some(CodeLocationWithFile::new(1, 15, 14, "models/zz.sql")),
+        }];
+        let mut nodes = Nodes::default();
+        nodes
+            .models
+            .insert("model.test.zz".to_string(), Arc::new(model));
+        let errors = resolve_dependencies(
+            &mut nodes,
+            &mut Nodes::default(),
+            &mut dbt_schemas::state::Operations::default(),
+            &NodeResolver::default(),
+        );
+        let message = errors.get("model.test.zz").expect("the node is in error");
+        assert!(message.contains("dbt1048"), "{message}");
+        assert!(message.contains("stg_custmers"), "{message}");
+        assert!(message.contains("--> models/zz.sql:1:15"), "{message}");
+        assert_eq!(errors.len(), 1);
     }
 
     #[test]

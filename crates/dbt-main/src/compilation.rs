@@ -549,7 +549,15 @@ impl<'a> CompilationPhasesExecutor<'a> {
                                 end_time: now,
                                 status: NodeStatus::Errored,
                                 thread_id: "main".to_string(),
-                                message: Some("Compilation Error".to_string()),
+                                // What failed and where, as the log printed it; the bare
+                                // phrase only where the error was not kept (ferrion#766).
+                                message: Some(
+                                    resolved_state
+                                        .resolution_error_messages
+                                        .get(uid)
+                                        .cloned()
+                                        .unwrap_or_else(|| "Compilation Error".to_string()),
+                                ),
                             })
                             .collect(),
                         nodes: Some(resolved_state.nodes.clone()),
