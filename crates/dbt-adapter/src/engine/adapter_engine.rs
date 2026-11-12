@@ -194,6 +194,18 @@ pub trait AdapterEngine: Send + Sync {
         0
     }
 
+    /// Whether this engine writes a keyed incremental (`merge`, `delete+insert`) onto the
+    /// matched rows of a relation in `database`, rather than rebuilding the table. `database`
+    /// is the catalog as the engine resolves it (quoted: exactly; unquoted: normalized).
+    ///
+    /// A host whose writer makes such a write for some catalogs and not others (ferrion: a
+    /// DuckLake lake attached to a tab, beside a catalog of one-object Parquet tables)
+    /// answers per catalog; behind the adapter method `ferrion_keyed_writes(relation)`.
+    /// Every other engine answers `false`, so nothing changes for them.
+    fn writes_keyed_in(&self, _database: &str) -> bool {
+        false
+    }
+
     /// Get the physical execution backend for sidecar engines.
     ///
     /// Returns the actual database backend (DuckDB, Snowflake, etc.) that SQL

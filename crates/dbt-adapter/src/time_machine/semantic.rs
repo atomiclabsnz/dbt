@@ -92,6 +92,7 @@ impl SemanticCategory {
             // No I/O at all
             "quote"
             | "quote_as_configured"
+            | "ferrion_keyed_writes"
             | "quote_seed_column"
             | "render_equals"
             | "convert_type"
