@@ -597,6 +597,32 @@ impl Adapter {
     ///     quote_key: str
     /// ) -> str
     /// ```
+    /// Whether this adapter's engine writes a keyed incremental onto the matched rows of
+    /// `relation` (`AdapterEngine::writes_keyed_in`, asked for the relation's catalog as the
+    /// engine resolves it: quoted, exactly; unquoted, normalized). A host-specific question
+    /// (ferrion#690): `false` for every engine that does not answer it, and while parsing.
+    ///
+    /// ```python
+    /// def ferrion_keyed_writes(self, relation: BaseRelation) -> bool
+    /// ```
+    pub fn ferrion_keyed_writes(&self, args: &[Value]) -> Result<Value, minijinja::Error> {
+        let iter = ArgsIter::new("ferrion_keyed_writes", &["relation"], args);
+        let relation = iter.next_arg::<&Value>()?;
+        iter.finish()?;
+        match &self.inner {
+            Typed { adapter, .. } => {
+                let relation = downcast_value_to_dyn_base_relation(relation)?;
+                // A relation with no catalog is in none the engine writes in place.
+                let Some(_) = relation.database() else {
+                    return Ok(Value::from(false));
+                };
+                let database = relation.database_as_resolved_str()?;
+                Ok(Value::from(adapter.engine().writes_keyed_in(&database)))
+            }
+            Parse(_) => Ok(Value::from(false)),
+        }
+    }
+
     #[tracing::instrument(skip_all, level = "trace")]
     pub fn quote_as_configured(
         &self,
@@ -3780,6 +3806,8 @@ impl Adapter {
             "quote" => self.quote(state, args),
             // identifier: str, quote_key: str
             "quote_as_configured" => self.quote_as_configured(state, args),
+            // relation: BaseRelation
+            "ferrion_keyed_writes" => self.ferrion_keyed_writes(args),
             // column: str, quote_config: Optional[bool]
             "quote_seed_column" => self.quote_seed_column(state, args),
             // relation: BaseRelation
