@@ -495,6 +495,28 @@ pub fn create_relation(
     Ok(result)
 }
 
+/// Whether `source()` reads a DuckDB source's `external_location` (dbt-duckdb's read in
+/// place), or the relation the source names. `true`, as dbt-duckdb does, unless a host
+/// says otherwise.
+static DUCKDB_EXTERNAL_LOCATIONS: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(true);
+
+/// For a host that runs a `type: duckdb` profile on an engine that is not DuckDB
+/// (ferrion#853): `false` makes `source()` resolve every source to the relation it names,
+/// whatever its `external_location`, because the location is a DuckDB read (`read_csv(…)`,
+/// a path) the engine does not run, and the engine holds the relation the location would
+/// have stood in for. A source whose relation the engine does not hold then fails, naming
+/// the relation, as any missing relation does. Process-wide, like the dispatch order: it
+/// is a fact about the engine every run in the process executes on.
+pub fn set_duckdb_external_locations(read: bool) {
+    DUCKDB_EXTERNAL_LOCATIONS.store(read, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// See [`set_duckdb_external_locations`].
+pub fn duckdb_external_locations() -> bool {
+    DUCKDB_EXTERNAL_LOCATIONS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 pub fn create_relation_from_source(
     adapter_type: AdapterType,
     database: String,
@@ -504,6 +526,7 @@ pub fn create_relation_from_source(
     source: &DbtSource,
 ) -> FsResult<Box<dyn BaseRelation>> {
     if adapter_type == AdapterType::DuckDB
+        && duckdb_external_locations()
         && let Some(external) = duckdb_external_location_for_source(source)?
     {
         return Ok(Box::new(
@@ -911,8 +934,47 @@ mod tests {
         source
     }
 
+    /// The tests that read [`DUCKDB_EXTERNAL_LOCATIONS`], one at a time: one of them sets it.
+    static EXTERNAL_LOCATIONS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn a_host_that_reads_relations_resolves_a_source_to_its_relation() {
+        let _one = EXTERNAL_LOCATIONS.lock().unwrap_or_else(|e| e.into_inner());
+        let source = source_with_meta_location("read_csv('orders.csv')");
+        let resolve = || {
+            create_relation_from_source(
+                AdapterType::DuckDB,
+                "main".to_string(),
+                "raw".to_string(),
+                "orders".to_string(),
+                DEFAULT_RESOLVED_QUOTING,
+                &source,
+            )
+            .unwrap()
+            .render_self_as_str()
+        };
+        set_duckdb_external_locations(false);
+        let relation = resolve();
+        set_duckdb_external_locations(true);
+        // The relation the source names, as a source with no location resolves.
+        let plain = create_relation(
+            AdapterType::DuckDB,
+            "main".to_string(),
+            "raw".to_string(),
+            Some("orders".to_string()),
+            None,
+            DEFAULT_RESOLVED_QUOTING,
+        )
+        .unwrap()
+        .render_self_as_str();
+        assert_eq!(relation, plain);
+        assert!(!relation.contains("read_csv"), "{relation}");
+        assert_eq!(resolve(), "read_csv('orders.csv')");
+    }
+
     #[test]
     fn duckdb_source_external_location_formats_and_quotes_path() {
+        let _one = EXTERNAL_LOCATIONS.lock().unwrap_or_else(|e| e.into_inner());
         let source = source_with_meta_location("data/{name}.csv");
 
         let relation = create_relation_from_source(
@@ -930,6 +992,7 @@ mod tests {
 
     #[test]
     fn duckdb_source_external_location_keeps_function_call_unquoted() {
+        let _one = EXTERNAL_LOCATIONS.lock().unwrap_or_else(|e| e.into_inner());
         let mut source = source_with_meta_location("ignored/{name}.csv");
         source.deprecated_config.external_location = Some("read_csv('orders.csv')".to_string());
 
